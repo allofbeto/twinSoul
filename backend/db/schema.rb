@@ -10,10 +10,32 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_06_27_180210) do
+ActiveRecord::Schema[7.0].define(version: 2026_06_27_211216) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
+
+  create_table "characters", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "user_id", null: false
+    t.string "name", null: false
+    t.string "race", null: false
+    t.integer "level", default: 1, null: false
+    t.integer "max_hp", null: false
+    t.integer "current_hp", null: false
+    t.integer "armor_class", null: false
+    t.string "game", default: "dnd_5e", null: false
+    t.integer "strength", default: 10
+    t.integer "dexterity", default: 10
+    t.integer "constitution", default: 10
+    t.integer "intelligence", default: 10
+    t.integer "wisdom", default: 10
+    t.integer "charisma", default: 10
+    t.string "classes", default: [], array: true
+    t.string "skills", default: [], array: true
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_characters_on_user_id"
+  end
 
   create_table "image_assets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "user_id", null: false
@@ -31,8 +53,12 @@ ActiveRecord::Schema[7.0].define(version: 2026_06_27_180210) do
     t.string "phone"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "active", default: true, null: false
+    t.boolean "closed", default: false, null: false
+    t.datetime "deactivated_at"
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 
+  add_foreign_key "characters", "users"
   add_foreign_key "image_assets", "users"
 end
