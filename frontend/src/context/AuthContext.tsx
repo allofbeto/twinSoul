@@ -6,6 +6,7 @@ interface User {
   last_name: string;
   email: string;
   phone: string;
+  theme: string;
 }
 
 interface AuthContextType {
@@ -14,21 +15,31 @@ interface AuthContextType {
   login: (token: string, user: User) => void;
   logout: () => void;
   isAuthenticated: boolean;
+  setTheme: (theme: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const applyTheme = (theme: string) => {
+  document.body.classList.remove('theme-default', 'theme-magic');
+  document.body.classList.add(`theme-${theme}`);
+};
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     if (storedToken && storedUser) {
+      const parsedUser = JSON.parse(storedUser);
       setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      setUser(parsedUser);
+      applyTheme(parsedUser.theme || 'default');
     }
+    setLoading(false);
   }, []);
 
   const login = (token: string, user: User) => {
@@ -36,6 +47,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.setItem('user', JSON.stringify(user));
     setToken(token);
     setUser(user);
+    applyTheme(user.theme || 'default');
   };
 
   const logout = () => {
@@ -43,24 +55,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
+    applyTheme('default');
   };
 
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
-  }, []);
+  const setTheme = (theme: string) => {
+    const updatedUser = { ...user!, theme };
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    setUser(updatedUser);
+    applyTheme(theme);
+  };
 
   if (loading) return null;
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, setTheme }}>
       {children}
     </AuthContext.Provider>
   );

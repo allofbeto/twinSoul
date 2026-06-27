@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_06_27_211216) do
+ActiveRecord::Schema[7.0].define(version: 2026_06_27_225306) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -56,6 +56,7 @@ ActiveRecord::Schema[7.0].define(version: 2026_06_27_211216) do
     t.boolean "active", default: true, null: false
     t.boolean "closed", default: false, null: false
     t.datetime "deactivated_at"
+    t.string "theme", default: "default", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 

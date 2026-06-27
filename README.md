@@ -20,6 +20,12 @@ npm run eject
 
 ## Create Models:
 - rails g [ModelName]
+- then add the needed cols in the migration file
+- then db:migrate
+- then add any required has_many or belongs_to in the associated models
+- then Move on to create a controller
 
 ## Create COntrollers:
 - rails g controller api/v1/[model_name_controller]
+- then add it to the routes.rb file
+- then add the associated backendhelpers in the backendHelpers.ts file 

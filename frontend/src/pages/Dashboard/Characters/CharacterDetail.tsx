@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { getCharacter, updateCharacter } from '../../../api/backendHelpers';
 import CharacterTopBar from './Components/CharacterTopBar';
-import BasicInfo from './Components/BasicInformation';
 import ClassSelector from './Components/ClassSelector';
 import AbilityScores from './Components/AbilityScores';
 import SkillSelector from './Components/SkillSelector';
+import CharacterArtBox from './Components/CharacterArtBox';
+import CharacterSidebar from './Components/CharacterSidebar';
+
 
 interface Character {
   id: string;
@@ -28,13 +30,17 @@ interface Character {
 
 const CharacterDetail = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isDirty, setIsDirty] = useState(false);
   const [form, setForm] = useState<Character | null>(null);
+
+  const setFieldValue = (field: string, value: string) => {
+    setForm({ ...form!, [field]: value });
+    setIsDirty(true);
+  };
 
   useEffect(() => {
     const fetch = async () => {
@@ -111,11 +117,25 @@ const CharacterDetail = () => {
           success={success}
           error={error}
         />
-        <BasicInfo
-          form={form}
-          handleChange={handleChange}
+  
+        <div className="character-overview">
+        <CharacterArtBox
+          level={form.level}
+          current_hp={form.current_hp}
+          armor_class={form.armor_class}
           handleNumberChange={handleNumberChange}
         />
+        <CharacterSidebar
+          max_hp={form.max_hp}
+          race={form.race}
+          classes={form.classes}
+          handleNumberChange={handleNumberChange}
+          handleChange={handleChange}
+          onToggleClass={toggleClass}
+          setFieldValue={setFieldValue}
+        />
+        </div>
+  
         <ClassSelector
           selected={form.classes}
           onToggle={toggleClass}

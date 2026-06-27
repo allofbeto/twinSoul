@@ -43,7 +43,8 @@ class Api::V1::UsersController < ApplicationController
         phone: user.phone,
         active: user.active,
         closed: user.closed,
-        deactivated_at: user.deactivated_at
+        deactivated_at: user.deactivated_at,
+        theme: user.theme
       }
     end
 end

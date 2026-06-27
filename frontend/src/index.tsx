@@ -7,6 +7,9 @@ import './styles/theme.css';
 import './styles/components.css';
 import './styles/sideNav.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import './styles/character.css';
+import './styles/themes/default.css';
+// import './styles/themes/magic.css';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement

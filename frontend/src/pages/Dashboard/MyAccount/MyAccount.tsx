@@ -4,7 +4,7 @@ import { updateUser, deactivateUser, closeUser, deleteUser } from '../../../api/
 import { useNavigate } from 'react-router-dom';
 
 const MyAccount = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, setTheme } = useAuth();
   const navigate = useNavigate();
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -16,6 +16,16 @@ const MyAccount = () => {
     phone: user?.phone || '',
     password: '',
   });
+
+  const handleThemeChange = async (theme: string) => {
+    try {
+      await updateUser({ theme });
+      setTheme(theme);
+      setSuccess('Theme updated!');
+    } catch {
+      setError('Could not update theme.');
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -141,6 +151,45 @@ const MyAccount = () => {
             {loading ? 'Saving...' : 'Save changes'}
           </button>
         </form>
+      </div>
+
+      <div className="card-theme p-4 mb-4">
+        <h5 className="text-theme mb-3">Theme</h5>
+        <div className="d-flex gap-3">
+          <div
+            onClick={() => handleThemeChange('default')}
+            style={{
+              cursor: 'pointer',
+              border: user?.theme === 'default' ? '2px solid var(--color-primary)' : '2px solid var(--color-border)',
+              borderRadius: '8px',
+              padding: '1rem 1.5rem',
+              background: '#0f0f1a',
+              color: '#f8f8f2',
+              textAlign: 'center',
+              minWidth: '120px',
+            }}
+          >
+            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🌙</div>
+            <small>Default</small>
+          </div>
+
+          <div
+            onClick={() => handleThemeChange('magic')}
+            style={{
+              cursor: 'pointer',
+              border: user?.theme === 'magic' ? '2px solid #d4af37' : '2px solid #3d2f1f',
+              borderRadius: '2px',
+              padding: '1rem 1.5rem',
+              background: '#0a0e1a',
+              color: '#e8dcc4',
+              textAlign: 'center',
+              minWidth: '120px',
+            }}
+          >
+            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>✨</div>
+            <small>Magic</small>
+          </div>
+        </div>
       </div>
 
       <div className="card-theme p-4">
