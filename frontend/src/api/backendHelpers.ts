@@ -4,6 +4,9 @@ import api from './axios';
 export const registerUser = (data: object) => api.post('/auth/register', data);
 export const loginUser = (data: object) => api.post('/auth/login', data);
 
+// Assets
+export const createImageAsset = (data: object) => api.post('/image_assets', data);
+
 // Characters
 export const getCharacters = () => api.get('/characters');
 export const getCharacter = (id: string) => api.get(`/characters/${id}`);

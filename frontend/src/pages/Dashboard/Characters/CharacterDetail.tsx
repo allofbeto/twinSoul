@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getCharacter, updateCharacter } from '../../../api/backendHelpers';
+import { getCharacter, updateCharacter, createImageAsset } from '../../../api/backendHelpers';
 import CharacterTopBar from './Components/CharacterTopBar';
 import ClassSelector from './Components/ClassSelector';
 import AbilityScores from './Components/AbilityScores';
@@ -26,6 +26,7 @@ interface Character {
   wisdom: number;
   charisma: number;
   skills: string[];
+  profile_image_id: string;
 }
 
 const CharacterDetail = () => {
@@ -37,6 +38,19 @@ const CharacterDetail = () => {
   const [isDirty, setIsDirty] = useState(false);
   const [form, setForm] = useState<Character | null>(null);
 
+  const [imageUrl, setImageUrl] = useState<string>(form?.profile_image_id || '');
+  const handleImageUrlChange = async (url: string) => {
+    try {
+      const res = await createImageAsset({ url });
+      console.log('image asset response:', res.data);
+      setForm({ ...form!, profile_image_id: res.data.id });
+      setImageUrl(url);
+      setIsDirty(true);
+    } catch (err) {
+      console.log('error:', err);
+    }
+  };
+
   const setFieldValue = (field: string, value: string) => {
     setForm({ ...form!, [field]: value });
     setIsDirty(true);
@@ -47,6 +61,9 @@ const CharacterDetail = () => {
       try {
         const res = await getCharacter(id!);
         setForm(res.data);
+        if (res.data.profile_image?.url) {
+          setImageUrl(res.data.profile_image.url);
+        }
       } catch {
         setError('Could not load character.');
       } finally {
@@ -92,7 +109,7 @@ const CharacterDetail = () => {
     setError('');
     setSuccess('');
     try {
-      await updateCharacter(id!, form!);
+      await updateCharacter(id!, { ...form!, image_url: imageUrl });
       setSuccess('Character updated!');
       setIsDirty(false);
     } catch (err: any) {
@@ -120,10 +137,12 @@ const CharacterDetail = () => {
   
         <div className="character-overview">
         <CharacterArtBox
+          imageUrl={imageUrl}
           level={form.level}
           current_hp={form.current_hp}
           armor_class={form.armor_class}
           handleNumberChange={handleNumberChange}
+          onImageUrlChange={handleImageUrlChange}
         />
         <CharacterSidebar
           max_hp={form.max_hp}
