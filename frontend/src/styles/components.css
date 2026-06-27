@@ -1,0 +1,73 @@
+/* Buttons */
+.btn-theme-primary {
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    color: #ffffff !important;
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.btn-theme-primary:hover {
+    background-color: var(--color-primary-hover) !important;
+    border-color: var(--color-primary-hover) !important;
+    color: #ffffff !important;
+}
+
+.btn-theme-primary:disabled {
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    color: #ffffff !important;
+    opacity: 0.6;
+}
+
+/* Cards */
+.card-theme {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    color: var(--color-text);
+}
+
+/* Inputs */
+.input-theme {
+    background-color: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    color: var(--color-text);
+}
+
+.input-theme:focus {
+    background-color: var(--color-surface-raised);
+    border-color: var(--color-primary);
+    color: var(--color-text);
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.3);
+    outline: none;
+}
+
+.input-theme::placeholder {
+    color: var(--color-text-muted);
+}
+
+/* Page background */
+.page-bg {
+    background-color: var(--color-background);
+    min-height: 100vh;
+    color: var(--color-text);
+}
+
+/* Surface */
+.surface {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+}
+
+/* Text helpers */
+.text-muted-theme {
+    color: var(--color-text-muted) !important;
+}
+
+.text-theme {
+    color: var(--color-text) !important;
+}
