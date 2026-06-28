@@ -27,6 +27,8 @@ interface Character {
   charisma: number;
   skills: string[];
   profile_image_id: string;
+  gold: number;
+  inspo: number;
 }
 
 const CharacterDetail = () => {
@@ -81,6 +83,14 @@ const CharacterDetail = () => {
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form!, [e.target.name]: parseInt(e.target.value) || 0 });
     setIsDirty(true);
+  };
+
+  const addClass = (cls: string) => {
+    setIsDirty(true);
+    setForm({
+      ...form!,
+      classes: [...form!.classes, cls],
+    });
   };
 
   const toggleClass = (cls: string) => {
@@ -146,11 +156,14 @@ const CharacterDetail = () => {
         />
         <CharacterSidebar
           max_hp={form.max_hp}
+          gold={form.gold}
+          inspo={form.inspo}
           race={form.race}
           classes={form.classes}
           handleNumberChange={handleNumberChange}
           handleChange={handleChange}
           onToggleClass={toggleClass}
+          onAddClass={addClass}
           setFieldValue={setFieldValue}
         />
         </div>
@@ -158,6 +171,7 @@ const CharacterDetail = () => {
         <ClassSelector
           selected={form.classes}
           onToggle={toggleClass}
+          onAdd={addClass}
         />
         <AbilityScores
           form={form}

@@ -74,7 +74,7 @@ class Api::V1::CharactersController < ApplicationController
         :name, :race, :level, :max_hp, :current_hp,
         :armor_class, :game, :strength, :dexterity,
         :constitution, :intelligence, :wisdom, :charisma,
-        :profile_image_id,
+        :profile_image_id, :gold, :inspo,
         classes: [], skills: []
       )
     end

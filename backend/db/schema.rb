@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_06_27_232419) do
+ActiveRecord::Schema[7.0].define(version: 2026_06_28_001416) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -35,6 +35,8 @@ ActiveRecord::Schema[7.0].define(version: 2026_06_27_232419) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.uuid "profile_image_id"
+    t.integer "gold", default: 0
+    t.integer "inspo", default: 0
     t.index ["profile_image_id"], name: "index_characters_on_profile_image_id"
     t.index ["user_id"], name: "index_characters_on_user_id"
   end
