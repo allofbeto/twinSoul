@@ -42,6 +42,8 @@ export const updatePlayer = (campaignId: string, playerId: string, data: object)
 export const removePlayer = (campaignId: string, playerId: string) => api.delete(`/campaigns/${campaignId}/players/${playerId}`);
 export const getPlayerProfile = (campaignId: string, playerId: string) => api.get(`/campaigns/${campaignId}/players/${playerId}/profile`);
 
+export const getJoinedCampaigns = () => api.get('/campaigns/joined');
+
 // User
 export const getUser = () => api.get('/user');
 export const updateUser = (data: object) => api.patch('/user', data);

@@ -7,7 +7,7 @@ class Api::V1::CharactersController < ApplicationController
     end
   
     def show
-      character = @current_user.characters.find(params[:id])
+      character = Character.find(params[:id])
       render json: character.as_json(
         include: { 
           profile_image: { 

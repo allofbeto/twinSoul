@@ -39,6 +39,11 @@ class Api::V1::CampaignsController < ApplicationController
     rescue ActiveRecord::RecordNotFound
       render json: { error: 'Campaign not found' }, status: :not_found
     end
+
+    def joined
+      campaigns = Campaign.joins(:players).where(players: { user_id: @current_user.id, active: true })
+      render json: campaigns, status: :ok
+    end
   
     private
   
