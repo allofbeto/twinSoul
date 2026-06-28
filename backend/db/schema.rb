@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_06_28_023658) do
+ActiveRecord::Schema[7.0].define(version: 2026_06_28_033316) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -58,6 +58,20 @@ ActiveRecord::Schema[7.0].define(version: 2026_06_28_023658) do
     t.index ["user_id"], name: "index_inventories_on_user_id"
   end
 
+  create_table "items", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "user_id", null: false
+    t.uuid "inventory_id"
+    t.string "name", null: false
+    t.string "categories", default: [], array: true
+    t.text "notes"
+    t.boolean "attunement"
+    t.boolean "consumable"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["inventory_id"], name: "index_items_on_inventory_id"
+    t.index ["user_id"], name: "index_items_on_user_id"
+  end
+
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "first_name", null: false
     t.string "last_name", null: false
@@ -78,4 +92,6 @@ ActiveRecord::Schema[7.0].define(version: 2026_06_28_023658) do
   add_foreign_key "image_assets", "users"
   add_foreign_key "inventories", "characters"
   add_foreign_key "inventories", "users"
+  add_foreign_key "items", "inventories"
+  add_foreign_key "items", "users"
 end

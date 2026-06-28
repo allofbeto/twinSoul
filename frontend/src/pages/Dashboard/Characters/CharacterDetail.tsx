@@ -183,6 +183,7 @@ const CharacterDetail = () => {
       charisma: form.charisma,
     }}
     proficiencyBonus={Math.ceil(form.level / 4) + 1}
+    characterId={form.id}
   />
 </div>
       </form>
