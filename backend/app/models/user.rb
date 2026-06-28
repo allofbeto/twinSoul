@@ -9,4 +9,5 @@ class User < ApplicationRecord
     has_many :characters, dependent: :destroy
     has_many :image_assets, dependent: :destroy
     has_many :items, dependent: :destroy
+    has_many :campaigns, dependent: :destroy
 end
