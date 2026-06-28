@@ -7,7 +7,16 @@ class Api::V1::CharactersController < ApplicationController
   
     def show
       character = @current_user.characters.find(params[:id])
-      render json: character, status: :ok
+      render json: character.as_json(
+        include: { 
+          profile_image: { 
+            only: [
+              :id, 
+              :url
+              ] 
+          } 
+        }
+      ), status: :ok
     rescue ActiveRecord::RecordNotFound
       render json: { error: 'Character not found' }, status: :not_found
     end
@@ -15,7 +24,16 @@ class Api::V1::CharactersController < ApplicationController
     def create
       character = @current_user.characters.build(character_params)
       if character.save
-        render json: character, status: :created
+        render json: character.as_json(
+        include: { 
+          profile_image: { 
+            only: [
+              :id, 
+              :url
+              ] 
+          } 
+        }
+      ), status: :created
       else
         render json: { errors: character.errors.full_messages }, status: :unprocessable_entity
       end
@@ -26,7 +44,16 @@ class Api::V1::CharactersController < ApplicationController
       if character.update(character_params)
         render json: character, status: :ok
       else
-        render json: { errors: character.errors.full_messages }, status: :unprocessable_entity
+        render json: character.as_json(
+        include: { 
+          profile_image: { 
+            only: [
+              :id, 
+              :url
+              ] 
+          } 
+        }
+      ), status: :created
       end
     rescue ActiveRecord::RecordNotFound
       render json: { error: 'Character not found' }, status: :not_found
@@ -47,6 +74,7 @@ class Api::V1::CharactersController < ApplicationController
         :name, :race, :level, :max_hp, :current_hp,
         :armor_class, :game, :strength, :dexterity,
         :constitution, :intelligence, :wisdom, :charisma,
+        :profile_image_id,
         classes: [], skills: []
       )
     end

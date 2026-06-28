@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_06_27_225306) do
+ActiveRecord::Schema[7.0].define(version: 2026_06_27_232419) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -34,6 +34,8 @@ ActiveRecord::Schema[7.0].define(version: 2026_06_27_225306) do
     t.string "skills", default: [], array: true
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.uuid "profile_image_id"
+    t.index ["profile_image_id"], name: "index_characters_on_profile_image_id"
     t.index ["user_id"], name: "index_characters_on_user_id"
   end
 
@@ -60,6 +62,7 @@ ActiveRecord::Schema[7.0].define(version: 2026_06_27_225306) do
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 
+  add_foreign_key "characters", "image_assets", column: "profile_image_id"
   add_foreign_key "characters", "users"
   add_foreign_key "image_assets", "users"
 end
