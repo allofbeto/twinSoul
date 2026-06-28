@@ -3,10 +3,9 @@ import { useParams } from 'react-router-dom';
 import { getCharacter, updateCharacter, createImageAsset } from '../../../api/backendHelpers';
 import CharacterTopBar from './Components/CharacterTopBar';
 import AbilityScores from './Components/AbilityScores';
-import SkillSelector from './Components/SkillSelector';
 import CharacterArtBox from './Components/CharacterArtBox';
 import CharacterSidebar from './Components/CharacterSidebar';
-
+import TabbedPanel from './Components/TabbedPanel';
 
 interface Character {
   id: string;
@@ -167,16 +166,25 @@ const CharacterDetail = () => {
         />
         </div>
   
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', alignItems: 'start' }}>
-          <AbilityScores
-            form={form}
-            handleNumberChange={handleNumberChange}
-          />
-          <SkillSelector
-            selected={form.skills}
-            onToggle={toggleSkill}
-          />
-        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', alignItems: 'stretch' }}>
+  <AbilityScores
+    form={form}
+    handleNumberChange={handleNumberChange}
+  />
+  <TabbedPanel
+    skills={form.skills}
+    onToggleSkill={toggleSkill}
+    abilityScores={{
+      strength: form.strength,
+      dexterity: form.dexterity,
+      constitution: form.constitution,
+      intelligence: form.intelligence,
+      wisdom: form.wisdom,
+      charisma: form.charisma,
+    }}
+    proficiencyBonus={Math.ceil(form.level / 4) + 1}
+  />
+</div>
       </form>
     </div>
   );

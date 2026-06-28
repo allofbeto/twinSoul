@@ -93,7 +93,7 @@ const RadarChart = ({ form }: { form: Props['form'] }) => {
 
 const AbilityScores = ({ form, handleNumberChange }: Props) => {
   return (
-    <div className="card-theme p-4 mb-4">
+    <div className="card-theme p-4 mb-4 h-100">
       <h5 className="text-theme mb-3">Ability Scores</h5>
       <div className="d-flex flex-column align-items-center gap-4">
   
