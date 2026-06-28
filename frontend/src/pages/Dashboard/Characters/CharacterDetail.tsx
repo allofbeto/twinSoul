@@ -167,14 +167,16 @@ const CharacterDetail = () => {
         />
         </div>
   
-        <AbilityScores
-          form={form}
-          handleNumberChange={handleNumberChange}
-        />
-        <SkillSelector
-          selected={form.skills}
-          onToggle={toggleSkill}
-        />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', alignItems: 'start' }}>
+          <AbilityScores
+            form={form}
+            handleNumberChange={handleNumberChange}
+          />
+          <SkillSelector
+            selected={form.skills}
+            onToggle={toggleSkill}
+          />
+        </div>
       </form>
     </div>
   );

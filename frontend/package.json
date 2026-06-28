@@ -15,6 +15,7 @@
     "react-dom": "^19.2.7",
     "react-router-dom": "^6.30.4",
     "react-scripts": "5.0.1",
+    "recharts": "^3.9.0",
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4"
   },
@@ -45,6 +46,12 @@
   "devDependencies": {
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@types/react-router-dom": "^5.3.3"
+    "@types/react-router-dom": "^5.3.3",
+    "@types/recharts": "^1.8.29"
+  },
+  "overrides": {
+    "recharts": {
+      "@types/react": "^18"
+    }
   }
 }
