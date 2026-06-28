@@ -13,9 +13,10 @@ interface Props {
   onToggleClass: (cls: string) => void;
   onAddClass: (cls: string) => void;
   setFieldValue: (field: string, value: string) => void;
+  isOwner: boolean;
 }
 
-const CharacterSidebar = ({ max_hp, inspo, gold, race, classes, handleNumberChange, onToggleClass, onAddClass, setFieldValue }: Props) => {
+const CharacterSidebar = ({ max_hp, inspo, gold, race, classes, handleNumberChange, onToggleClass, onAddClass, setFieldValue, isOwner }: Props) => {
   return (
     <div className="character-sidebar card-theme p-4">
 
@@ -29,6 +30,7 @@ const CharacterSidebar = ({ max_hp, inspo, gold, race, classes, handleNumberChan
           value={max_hp}
           onChange={handleNumberChange}
           min={0}
+          disabled={!isOwner}
         />
       </div>
       <hr className="sidebar-divider" />
@@ -43,6 +45,7 @@ const CharacterSidebar = ({ max_hp, inspo, gold, race, classes, handleNumberChan
           value={inspo}
           onChange={handleNumberChange}
           min={0}
+          disabled={!isOwner}
         />
       </div>
       <hr className="sidebar-divider" />
@@ -57,6 +60,7 @@ const CharacterSidebar = ({ max_hp, inspo, gold, race, classes, handleNumberChan
           value={gold}
           onChange={handleNumberChange}
           min={0}
+          disabled={!isOwner}
         />
       </div>
       <hr className="sidebar-divider" />
@@ -64,30 +68,42 @@ const CharacterSidebar = ({ max_hp, inspo, gold, race, classes, handleNumberChan
       {/* Race */}
       <div className="character-sidebar-col">
         <span className="text-muted-theme mb-2">Race</span>
-        <SearchBubbleInput
-          options={DND_RACES}
-          selected={race ? [race] : []}
-          onAdd={(val) => setFieldValue('race', val)}
-          onRemove={() => setFieldValue('race', '')}
-          placeholder="Search or create a race..."
-          multiSelect={false}
-          allowCreate={true}
-        />
+        {isOwner ? (
+          <SearchBubbleInput
+            options={DND_RACES}
+            selected={race ? [race] : []}
+            onAdd={(val) => setFieldValue('race', val)}
+            onRemove={() => setFieldValue('race', '')}
+            placeholder="Search or create a race..."
+            multiSelect={false}
+            allowCreate={true}
+          />
+        ) : (
+          <span className="text-theme">{race || '—'}</span>
+        )}
       </div>
       <hr className="sidebar-divider" />
 
       {/* Classes */}
       <div className="character-sidebar-col">
         <span className="text-muted-theme mb-2">Classes</span>
-        <SearchBubbleInput
-          options={DND_CLASSES}
-          selected={classes}
-          onAdd={onAddClass}
-          onRemove={onToggleClass}
-          placeholder="Search or create a class..."
-          multiSelect={true}
-          allowCreate={true}
-        />
+        {isOwner ? (
+          <SearchBubbleInput
+            options={DND_CLASSES}
+            selected={classes}
+            onAdd={onAddClass}
+            onRemove={onToggleClass}
+            placeholder="Search or create a class..."
+            multiSelect={true}
+            allowCreate={true}
+          />
+        ) : (
+          <div className="d-flex flex-wrap gap-1 mt-1">
+            {classes.length > 0 ? classes.map((cls) => (
+              <span key={cls} className="badge-cls" style={{ fontSize: '0.8rem' }}>{cls}</span>
+            )) : <span className="text-muted-theme">—</span>}
+          </div>
+        )}
       </div>
 
     </div>

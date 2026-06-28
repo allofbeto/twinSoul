@@ -7,9 +7,10 @@ interface Props {
   armor_class: number;
   handleNumberChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onImageUrlChange: (url: string) => void;
+  isOwner: boolean;
 }
 
-const CharacterArtBox = ({ imageUrl, level, current_hp, armor_class, handleNumberChange, onImageUrlChange }: Props) => {
+const CharacterArtBox = ({ imageUrl, level, current_hp, armor_class, handleNumberChange, onImageUrlChange, isOwner }: Props) => {
   const [editing, setEditing] = useState(false);
   const [urlInput, setUrlInput] = useState(imageUrl || '');
 
@@ -20,8 +21,12 @@ const CharacterArtBox = ({ imageUrl, level, current_hp, armor_class, handleNumbe
 
   return (
     <div className="character-art-wrapper">
-      <div className="character-art-box" onClick={() => !editing && setEditing(true)}>
-        {editing ? (
+      <div
+        className="character-art-box"
+        onClick={() => isOwner && !editing && setEditing(true)}
+        style={{ cursor: isOwner ? 'pointer' : 'default' }}
+      >
+        {editing && isOwner ? (
           <div className="character-art-url-editor">
             <p className="text-muted-theme mb-2" style={{ fontSize: '0.8rem' }}>Paste image URL</p>
             <input
@@ -46,7 +51,7 @@ const CharacterArtBox = ({ imageUrl, level, current_hp, armor_class, handleNumbe
           <img src={imageUrl} alt="Character art" className="character-art-img" />
         ) : (
           <div className="character-art-placeholder">
-            <span>+ Add Art</span>
+            <span>{isOwner ? '+ Add Art' : 'No Art'}</span>
           </div>
         )}
       </div>
@@ -62,6 +67,7 @@ const CharacterArtBox = ({ imageUrl, level, current_hp, armor_class, handleNumbe
             onChange={handleNumberChange}
             min={1}
             max={20}
+            disabled={!isOwner}
           />
         </div>
         <div className="character-stat">
@@ -73,6 +79,7 @@ const CharacterArtBox = ({ imageUrl, level, current_hp, armor_class, handleNumbe
             value={current_hp}
             onChange={handleNumberChange}
             min={0}
+            disabled={!isOwner}
           />
         </div>
         <div className="character-stat">
@@ -84,6 +91,7 @@ const CharacterArtBox = ({ imageUrl, level, current_hp, armor_class, handleNumbe
             value={armor_class}
             onChange={handleNumberChange}
             min={0}
+            disabled={!isOwner}
           />
         </div>
       </div>

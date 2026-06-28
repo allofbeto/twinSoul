@@ -13,6 +13,7 @@ interface Props {
     charisma: number;
   };
   proficiencyBonus: number;
+  isOwner: boolean;
 }
 
 const ABILITY_LABELS: Record<string, string> = {
@@ -26,7 +27,7 @@ const ABILITY_LABELS: Record<string, string> = {
 
 const getModifier = (score: number) => Math.floor((score - 10) / 2);
 
-const SkillSelector = ({ selected, onToggle, abilityScores, proficiencyBonus }: Props) => {
+const SkillSelector = ({ selected, onToggle, abilityScores, proficiencyBonus, isOwner }: Props) => {
   const [openGroup, setOpenGroup] = useState<string>('dexterity');
 
   const grouped = DND_SKILLS.reduce((acc, skill) => {
@@ -92,7 +93,8 @@ const SkillSelector = ({ selected, onToggle, abilityScores, proficiencyBonus }: 
                     <div
                       key={name}
                       className="skill-row"
-                      onClick={() => onToggle(name)}
+                      onClick={() => isOwner && onToggle(name)}
+                      style={{ cursor: isOwner ? 'pointer' : 'default' }}
                     >
                       <div className={`skill-proficiency-dot ${isProficient ? 'active' : ''}`} />
                       <span className="skill-name">{name}</span>

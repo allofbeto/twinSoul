@@ -26,6 +26,6 @@ npm run eject
 - then Move on to create a controller
 
 ## Create COntrollers:
-- rails g controller api/v1/[model_name_controller]
+- rails g controller api/v1/[model_name_controller{make_plural_mannually}]
 - then add it to the routes.rb file
 - then add the associated backendhelpers in the backendHelpers.ts file 

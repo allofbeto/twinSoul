@@ -12,6 +12,7 @@ import CharacterDetail from './pages/Dashboard/Characters/CharacterDetail';
 import NewCharacter from './pages/Dashboard/Characters/NewCharacter';
 import Home from './pages/Dashboard/Home/Home';
 import MyAccount from './pages/Dashboard/MyAccount/MyAccount';
+import PlayerProfile from './pages/Players/PlayerProfile';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
@@ -35,11 +36,12 @@ const App = () => {
           >
             <Route index element={<Home />} />
             <Route path="characters" element={<Characters />} />
-            <Route path="characters/:id" element={<CharacterDetail />} />
             <Route path="characters/new" element={<NewCharacter />} />
-            <Route path="campaigns/:id" element={<CampaignDetail />} />
+            <Route path="characters/:id" element={<CharacterDetail />} />
             <Route path="campaigns" element={<Campaigns />} />
             <Route path="campaigns/new" element={<NewCampaign />} />
+            <Route path="campaigns/:id" element={<CampaignDetail />} />
+            <Route path="campaigns/:id/players/:playerId" element={<PlayerProfile />} />
             <Route path="my_account" element={<MyAccount />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" />} />

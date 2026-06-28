@@ -11,6 +11,7 @@ interface Props {
     charisma: number;
   };
   handleNumberChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  isOwner: boolean;
 }
 
 const getModifier = (score: number) => {
@@ -91,15 +92,15 @@ const RadarChart = ({ form }: { form: Props['form'] }) => {
   );
 };
 
-const AbilityScores = ({ form, handleNumberChange }: Props) => {
+const AbilityScores = ({ form, handleNumberChange, isOwner }: Props) => {
   return (
     <div className="card-theme p-4 mb-4 h-100">
       <h5 className="text-theme mb-3">Ability Scores</h5>
       <div className="d-flex flex-column align-items-center gap-4">
-  
+
         {/* Radar Chart */}
         <RadarChart form={form} />
-  
+
         {/* Inputs - 2 rows of 3 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', width: '100%' }}>
           {ABILITY_SCORES.map(({ key, label }) => (
@@ -113,12 +114,13 @@ const AbilityScores = ({ form, handleNumberChange }: Props) => {
                 max={30}
                 value={(form as any)[key]}
                 onChange={handleNumberChange}
+                disabled={!isOwner}
               />
               <small className="text-muted-theme">{getModifier((form as any)[key])}</small>
             </div>
           ))}
         </div>
-  
+
       </div>
     </div>
   );

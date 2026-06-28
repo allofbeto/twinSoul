@@ -27,6 +27,21 @@ class Api::V1::UsersController < ApplicationController
       @current_user.destroy
       render json: { message: 'Account deleted' }, status: :ok
     end
+
+    def search
+      user = User.find_by(email: params[:email])
+      if user
+        render json: {
+          id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email: user.email,
+          characters: user.characters.map { |c| { id: c.id, name: c.name, race: c.race, level: c.level } }
+        }, status: :ok
+      else
+        render json: { error: 'User not found' }, status: :not_found
+      end
+    end
   
     private
   

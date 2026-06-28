@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '../../../context/AuthContext';
 import { useParams } from 'react-router-dom';
 import { getCharacter, updateCharacter, createImageAsset } from '../../../api/backendHelpers';
 import CharacterTopBar from './Components/CharacterTopBar';
@@ -9,6 +10,7 @@ import TabbedPanel from './Components/TabbedPanel';
 
 interface Character {
   id: string;
+  user_id: string;
   name: string;
   race: string;
   classes: string[];
@@ -39,6 +41,9 @@ const CharacterDetail = () => {
   const [success, setSuccess] = useState('');
   const [isDirty, setIsDirty] = useState(false);
   const [form, setForm] = useState<Character | null>(null);
+
+  const { user } = useAuth();
+  const isOwner = form?.user_id === user?.id;
 
   const [imageUrl, setImageUrl] = useState<string>(form?.profile_image_id || '');
   const handleImageUrlChange = async (url: string) => {
@@ -159,7 +164,7 @@ const CharacterDetail = () => {
           name={form.name}
           race={form.race}
           level={form.level}
-          isDirty={isDirty}
+          isDirty={isDirty && isOwner}
           saving={saving}
           success={success}
           error={error}
@@ -171,48 +176,53 @@ const CharacterDetail = () => {
         />
   
         <div className="character-overview">
-        <CharacterArtBox
-          imageUrl={imageUrl}
-          level={form.level}
-          current_hp={form.current_hp}
-          armor_class={form.armor_class}
-          handleNumberChange={handleNumberChange}
-          onImageUrlChange={handleImageUrlChange}
-        />
-        <CharacterSidebar
-          max_hp={form.max_hp}
-          gold={form.gold}
-          inspo={form.inspo}
-          race={form.race}
-          classes={form.classes}
-          handleNumberChange={handleNumberChange}
-          handleChange={handleChange}
-          onToggleClass={toggleClass}
-          onAddClass={addClass}
-          setFieldValue={setFieldValue}
-        />
+          <CharacterArtBox
+            imageUrl={imageUrl}
+            level={form.level}
+            current_hp={form.current_hp}
+            armor_class={form.armor_class}
+            handleNumberChange={handleNumberChange}
+            onImageUrlChange={handleImageUrlChange}
+            isOwner={isOwner}
+          />
+          <CharacterSidebar
+            max_hp={form.max_hp}
+            gold={form.gold}
+            inspo={form.inspo}
+            race={form.race}
+            classes={form.classes}
+            handleNumberChange={handleNumberChange}
+            handleChange={handleChange}
+            onToggleClass={toggleClass}
+            onAddClass={addClass}
+            setFieldValue={setFieldValue}
+            isOwner={isOwner}
+          />
         </div>
   
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', alignItems: 'stretch' }}>
-  <AbilityScores
-    form={form}
-    handleNumberChange={handleNumberChange}
-  />
-  <TabbedPanel
-    skills={form.skills}
-    onToggleSkill={toggleSkill}
-    abilityScores={{
-      strength: form.strength,
-      dexterity: form.dexterity,
-      constitution: form.constitution,
-      intelligence: form.intelligence,
-      wisdom: form.wisdom,
-      charisma: form.charisma,
-    }}
-    proficiencyBonus={Math.ceil(form.level / 4) + 1}
-    characterId={form.id}
-  />
-</div>
+          <AbilityScores
+            form={form}
+            handleNumberChange={handleNumberChange}
+            isOwner={isOwner}
+
+          />
+          <TabbedPanel
+            skills={form.skills}
+            onToggleSkill={toggleSkill}
+            abilityScores={{
+              strength: form.strength,
+              dexterity: form.dexterity,
+              constitution: form.constitution,
+              intelligence: form.intelligence,
+              wisdom: form.wisdom,
+              charisma: form.charisma,
+            }}
+            proficiencyBonus={Math.ceil(form.level / 4) + 1}
+            characterId={form.id}
+            isOwner={isOwner}
+          />
+        </div>
       </form>
     </div>
   );

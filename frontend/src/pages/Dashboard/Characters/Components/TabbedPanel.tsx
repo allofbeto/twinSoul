@@ -17,6 +17,7 @@ interface Props {
   };
   proficiencyBonus: number;
   characterId: string;
+  isOwner: boolean;
 }
 
 const TABS: { key: Tab; label: string }[] = [
@@ -25,7 +26,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'notes', label: 'Notes' },
 ];
 
-const TabbedPanel = ({ skills, onToggleSkill, abilityScores, proficiencyBonus, characterId }: Props) => {
+const TabbedPanel = ({ skills, onToggleSkill, abilityScores, proficiencyBonus, characterId, isOwner }: Props) => {
   const [activeTab, setActiveTab] = useState<Tab>('skills');
 
   return (
@@ -50,6 +51,7 @@ const TabbedPanel = ({ skills, onToggleSkill, abilityScores, proficiencyBonus, c
             onToggle={onToggleSkill}
             abilityScores={abilityScores}
             proficiencyBonus={proficiencyBonus}
+            isOwner={isOwner}
           />
         )}
         {activeTab === 'inventory' && (

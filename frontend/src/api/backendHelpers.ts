@@ -35,9 +35,18 @@ export const createItem = (data: object) => api.post('/items', data);
 export const updateItem = (id: string, data: object) => api.patch(`/items/${id}`, data);
 export const deleteItem = (id: string) => api.delete(`/items/${id}`);
 
+// Players
+export const getPlayers = (campaignId: string) => api.get(`/campaigns/${campaignId}/players`);
+export const addPlayer = (campaignId: string, data: object) => api.post(`/campaigns/${campaignId}/players`, data);
+export const updatePlayer = (campaignId: string, playerId: string, data: object) => api.patch(`/campaigns/${campaignId}/players/${playerId}`, data);
+export const removePlayer = (campaignId: string, playerId: string) => api.delete(`/campaigns/${campaignId}/players/${playerId}`);
+export const getPlayerProfile = (campaignId: string, playerId: string) => api.get(`/campaigns/${campaignId}/players/${playerId}/profile`);
+
 // User
 export const getUser = () => api.get('/user');
 export const updateUser = (data: object) => api.patch('/user', data);
 export const deactivateUser = () => api.patch('/user/deactivate');
 export const closeUser = () => api.patch('/user/close');
 export const deleteUser = () => api.delete('/user');
+
+export const searchUser = (email: string) => api.get(`/users/search?email=${email}`);

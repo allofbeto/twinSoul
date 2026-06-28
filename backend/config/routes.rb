@@ -1,9 +1,14 @@
 Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
-      post 'auth/register', to: 'authentication#register'
       post 'auth/login', to: 'authentication#login'
-      resources :campaigns
+      post 'auth/register', to: 'authentication#register'
+      get 'campaigns/:campaign_id/players/:id/profile', to: 'players#profile'
+      get 'users/search', to: 'users#search'
+      resources :campaigns do
+        resources :players, only: [:index, :show, :create, :update, :destroy] do
+        end
+      end
       resources :characters do
         resource :inventory, only: [:show, :create] do
           resources :items, only: [:index, :create, :update, :destroy]
