@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getCharacter, updateCharacter, createImageAsset } from '../../../api/backendHelpers';
 import CharacterTopBar from './Components/CharacterTopBar';
-import ClassSelector from './Components/ClassSelector';
 import AbilityScores from './Components/AbilityScores';
 import SkillSelector from './Components/SkillSelector';
 import CharacterArtBox from './Components/CharacterArtBox';
@@ -168,11 +167,6 @@ const CharacterDetail = () => {
         />
         </div>
   
-        <ClassSelector
-          selected={form.classes}
-          onToggle={toggleClass}
-          onAdd={addClass}
-        />
         <AbilityScores
           form={form}
           handleNumberChange={handleNumberChange}
