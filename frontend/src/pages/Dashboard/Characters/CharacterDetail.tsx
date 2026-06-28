@@ -27,6 +27,8 @@ interface Character {
   profile_image_id: string;
   gold: number;
   inspo: number;
+  campaign_id: string | null;
+  campaign?: { id: string; name: string };
 }
 
 const CharacterDetail = () => {
@@ -117,7 +119,27 @@ const CharacterDetail = () => {
     setError('');
     setSuccess('');
     try {
-      await updateCharacter(id!, { ...form!, image_url: imageUrl });
+      await updateCharacter(id!, {
+        name: form!.name,
+        race: form!.race,
+        level: form!.level,
+        max_hp: form!.max_hp,
+        current_hp: form!.current_hp,
+        armor_class: form!.armor_class,
+        game: form!.game,
+        strength: form!.strength,
+        dexterity: form!.dexterity,
+        constitution: form!.constitution,
+        intelligence: form!.intelligence,
+        wisdom: form!.wisdom,
+        charisma: form!.charisma,
+        classes: form!.classes,
+        skills: form!.skills,
+        profile_image_id: form!.profile_image_id,
+        gold: form!.gold,
+        inspo: form!.inspo,
+        campaign_id: form!.campaign_id,
+      });
       setSuccess('Character updated!');
       setIsDirty(false);
     } catch (err: any) {
@@ -141,6 +163,11 @@ const CharacterDetail = () => {
           saving={saving}
           success={success}
           error={error}
+          campaignId={form.campaign_id}
+          onCampaignChange={(id) => {
+            setForm({ ...form!, campaign_id: id });
+            setIsDirty(true);
+          }}
         />
   
         <div className="character-overview">

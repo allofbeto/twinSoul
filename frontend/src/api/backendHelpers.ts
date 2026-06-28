@@ -7,6 +7,13 @@ export const loginUser = (data: object) => api.post('/auth/login', data);
 // Assets
 export const createImageAsset = (data: object) => api.post('/image_assets', data);
 
+// Campaigns
+export const getCampaigns = () => api.get('/campaigns');
+export const getCampaign = (id: string) => api.get(`/campaigns/${id}`);
+export const createCampaign = (data: object) => api.post('/campaigns', data);
+export const updateCampaign = (id: string, data: object) => api.patch(`/campaigns/${id}`, data);
+export const deleteCampaign = (id: string) => api.delete(`/campaigns/${id}`);
+
 // Characters
 export const getCharacters = () => api.get('/characters');
 export const getCharacter = (id: string) => api.get(`/characters/${id}`);

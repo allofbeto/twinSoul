@@ -5,6 +5,8 @@ import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Registration';
 import DashboardLayout from './pages/Dashboard/DashboardLayout';
 import Campaigns from './pages/Dashboard/Campaigns/Campaigns';
+import NewCampaign from './pages/Dashboard/Campaigns/NewCampaign';
+import CampaignDetail from './pages/Dashboard/Campaigns/CampaignDetail';
 import Characters from './pages/Dashboard/Characters/Characters';
 import CharacterDetail from './pages/Dashboard/Characters/CharacterDetail';
 import NewCharacter from './pages/Dashboard/Characters/NewCharacter';
@@ -35,7 +37,9 @@ const App = () => {
             <Route path="characters" element={<Characters />} />
             <Route path="characters/:id" element={<CharacterDetail />} />
             <Route path="characters/new" element={<NewCharacter />} />
+            <Route path="campaigns/:id" element={<CampaignDetail />} />
             <Route path="campaigns" element={<Campaigns />} />
+            <Route path="campaigns/new" element={<NewCampaign />} />
             <Route path="my_account" element={<MyAccount />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" />} />

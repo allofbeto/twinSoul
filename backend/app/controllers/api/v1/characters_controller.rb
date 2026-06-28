@@ -1,5 +1,6 @@
 class Api::V1::CharactersController < ApplicationController
     include Authenticatable
+    wrap_parameters false
   
     def index
       render json: @current_user.characters, status: :ok
@@ -14,6 +15,12 @@ class Api::V1::CharactersController < ApplicationController
               :id, 
               :url
               ] 
+          },
+          campaign: { 
+            only: [
+              :id, 
+              :name
+            ] 
           } 
         }
       ), status: :ok
@@ -74,7 +81,7 @@ class Api::V1::CharactersController < ApplicationController
         :name, :race, :level, :max_hp, :current_hp,
         :armor_class, :game, :strength, :dexterity,
         :constitution, :intelligence, :wisdom, :charisma,
-        :profile_image_id, :gold, :inspo,
+        :profile_image_id, :campaign_id, :gold, :inspo,
         classes: [], skills: []
       )
     end

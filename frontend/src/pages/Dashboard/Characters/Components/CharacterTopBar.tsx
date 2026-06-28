@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import CampaignSelector from './CampaignSelector';
 
 interface Props {
   name: string;
@@ -9,17 +10,25 @@ interface Props {
   saving: boolean;
   success: string;
   error: string;
+  campaignId: string | null;
+  onCampaignChange: (id: string | null) => void;
 }
 
-const CharacterTopBar = ({ name, race, level, isDirty, saving, success, error }: Props) => {
+const CharacterTopBar = ({ name, race, level, isDirty, saving, success, error, campaignId, onCampaignChange }: Props) => {
   const navigate = useNavigate();
 
   return (
     <div className="sticky-save-bar">
       <div className="d-flex align-items-center justify-content-between">
         <div>
-          <h2 className="text-theme mb-0">{name}</h2>
-          <small className="text-muted-theme">{race} — Level {level}</small>
+          <h2 className="text-theme mb-2">{name}</h2>
+          <div className="d-flex align-items-center gap-3" style={{width: '90vh'}}>
+            <small className="text-muted-theme">{race} — Level {level}</small>
+            <CampaignSelector
+              campaignId={campaignId}
+              onChange={onCampaignChange}
+            />
+          </div>
         </div>
         <div className="d-flex gap-2 align-items-center">
           {success && <span className="text-success">{success}</span>}

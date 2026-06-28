@@ -1,6 +1,7 @@
 class Character < ApplicationRecord
     belongs_to :user
     belongs_to :profile_image, class_name: 'ImageAsset', optional: true
+    belongs_to :campaign, optional: true
 
     has_one :inventory, dependent: :destroy
   
