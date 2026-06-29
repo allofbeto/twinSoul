@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getCampaign, updateCampaign, getPlayers, removePlayer } from '../../../api/backendHelpers';
-import DataTable from '../../../components/DataTable';
-import AddPlayerForm from '../../Players/AddPlayerForm';
+import { getCampaign, updateCampaign, getPlayers } from '../../../api/backendHelpers';
+import CampaignOverview from './Components/Overview';
+import CampaignPlayers from './Components/CampaignPlayers';
+import CampaignSessions from './Components/CampaignSessions';
+import CampaignItems from './Components/CampaignItems';
 
 interface Campaign {
   id: string;
@@ -27,6 +29,15 @@ interface Player {
   user_id: string;
 }
 
+type Tab = 'overview' | 'players' | 'sessions' | 'items';
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'players', label: 'Players' },
+  { key: 'sessions', label: 'Sessions' },
+  { key: 'items', label: 'Items' },
+];
+
 const CampaignDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -37,7 +48,7 @@ const CampaignDetail = () => {
   const [isDirty, setIsDirty] = useState(false);
   const [form, setForm] = useState<Campaign | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
-  const [showAddPlayer, setShowAddPlayer] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   useEffect(() => {
     const fetch = async () => {
@@ -78,16 +89,6 @@ const CampaignDetail = () => {
     }
   };
 
-  const handleDeactivate = async (playerId: string) => {
-    if (!window.confirm('Remove this player from the campaign?')) return;
-    try {
-      await removePlayer(id!, playerId);
-      setPlayers((prev) => prev.map((p) => p.id === playerId ? { ...p, active: false } : p));
-    } catch {
-      setError('Could not remove player.');
-    }
-  };
-
   if (loading) return <p className="text-muted-theme">Loading...</p>;
   if (!form) return <p className="text-muted-theme">Campaign not found.</p>;
 
@@ -118,143 +119,47 @@ const CampaignDetail = () => {
               )}
             </div>
           </div>
+
+          {/* Tabs */}
+          <div className="tabbed-panel-tabs mt-2">
+            {TABS.map((tab) => (
+              <button
+                type="button"
+                key={tab.key}
+                className={`tabbed-panel-tab ${activeTab === tab.key ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Campaign Info */}
-        <div className="card-theme p-4 mb-4">
-          <div className="mb-3">
-            <label className="form-label text-muted-theme">Name</label>
-            <input
-              type="text"
-              name="name"
-              className="form-control input-theme"
-              value={form.name}
-              onChange={handleChange}
-              required
+        {/* Tab Content */}
+        <div className="mt-4">
+          {activeTab === 'overview' && (
+            <CampaignOverview
+              form={form}
+              players={players}
+              handleChange={handleChange}
             />
-          </div>
-          <div className="mb-3">
-            <label className="form-label text-muted-theme">Description</label>
-            <textarea
-              name="description"
-              className="form-control input-theme"
-              value={form.description || ''}
-              onChange={handleChange}
-              rows={4}
-            />
-          </div>
-          <div className="mb-3">
-            <label className="form-label text-muted-theme">Status</label>
-            <select
-              name="status"
-              className="form-select input-theme"
-              value={form.status}
-              onChange={handleChange}
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="archived">Archived</option>
-            </select>
-          </div>
+          )}
         </div>
       </form>
 
-      {/* Players */}
-      <div className="card-theme p-4 mb-4">
-      <div className="d-flex justify-content-between align-items-center mb-3">
-  <h5 className="text-theme mb-0">Players</h5>
-  <button
-    type="button"
-    className="btn btn-theme-primary btn-sm"
-    onClick={() => setShowAddPlayer(!showAddPlayer)}
-  >
-    {showAddPlayer ? 'Cancel' : '+ Add Player'}
-  </button>
-</div>
-
-{showAddPlayer && (
-  <AddPlayerForm
-    campaignId={id!}
-    onPlayerAdded={() => {
-      setShowAddPlayer(false);
-      // refetch players
-      getPlayers(id!).then((res) => setPlayers(res.data));
-    }}
-  />
-)}
-
-        <DataTable
-          columns={[
-            {
-              key: 'user_name',
-              label: 'PLAYER',
-              width: '30%',
-              sortable: true,
-              render: (player: Player) => (
-                <span
-                  style={{ color: 'var(--color-primary)', cursor: 'pointer' }}
-                  onClick={() => navigate(`/dashboard/campaigns/${id}/players/${player.id}`)}
-                >
-                  {player.user_name}
-                </span>
-              ),
-            },
-            {
-              key: 'user_email',
-              label: 'EMAIL',
-              width: '30%',
-              render: (player: Player) => (
-                <span className="text-muted-theme" style={{ fontSize: '0.875rem' }}>
-                  {player.user_email}
-                </span>
-              ),
-            },
-            {
-              key: 'active',
-              label: 'STATUS',
-              width: '20%',
-              align: 'center' as const,
-              render: (player: Player) => (
-                <span className="badge-cls" style={{
-                  fontSize: '0.7rem',
-                  background: player.active ? 'var(--color-success)' : 'var(--color-text-muted)'
-                }}>
-                  {player.active ? 'Active' : 'Inactive'}
-                </span>
-              ),
-            },
-            {
-              key: 'actions',
-              label: '',
-              width: '20%',
-              align: 'right' as const,
-              render: (player: Player) => player.active ? (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-danger"
-                  onClick={() => handleDeactivate(player.id)}
-                >
-                  Remove
-                </button>
-              ) : null,
-            },
-          ]}
-          data={players}
-          keyField="id"
-          pageSize={10}
-          searchable
-          searchPlaceholder="Search players..."
-          emptyMessage="No players yet."
+      {activeTab === 'players' && (
+        <CampaignPlayers
+          campaignId={id!}
+          players={players}
+          setPlayers={setPlayers}
         />
-
-        {players.filter((p) => !p.active).length > 0 && (
-          <div className="mt-2">
-            <small className="text-muted-theme">
-              {players.filter((p) => !p.active).length} inactive player{players.filter((p) => !p.active).length > 1 ? 's' : ''}
-            </small>
-          </div>
-        )}
-      </div>
+      )}
+      {activeTab === 'sessions' && (
+        <CampaignSessions campaignId={id!} />
+      )}
+      {activeTab === 'items' && (
+        <CampaignItems campaignId={id!} />
+      )}
     </div>
   );
 };

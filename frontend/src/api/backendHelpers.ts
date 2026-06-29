@@ -46,6 +46,12 @@ export const getPlayerProfile = (campaignId: string, playerId: string) => api.ge
 
 export const getJoinedCampaigns = () => api.get('/campaigns/joined');
 
+// Sessions
+export const getSessions = (campaignId?: string) => campaignId ? api.get(`/sessions?campaign_id=${campaignId}`) : api.get('/sessions');
+export const createSession = (data: object) => api.post('/sessions', data);
+export const updateSession = (sessionId: string, data: object) => api.patch(`/sessions/${sessionId}`, data);
+export const deleteSession = (sessionId: string) => api.delete(`/sessions/${sessionId}`);
+
 // User
 export const getUser = () => api.get('/user');
 export const updateUser = (data: object) => api.patch('/user', data);
