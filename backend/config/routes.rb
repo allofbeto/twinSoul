@@ -18,6 +18,7 @@ Rails.application.routes.draw do
       end
       resources :image_assets, only: [:index, :create, :destroy]
       resources :items
+      resources :sessions, only: [:index, :create, :update, :destroy]
       resource :user, only: [:show, :update, :destroy] do
         patch :deactivate
         patch :close

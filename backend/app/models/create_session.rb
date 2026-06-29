@@ -1,0 +1,2 @@
+class CreateSession < ApplicationRecord
+end

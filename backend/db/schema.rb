@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_06_28_205838) do
+ActiveRecord::Schema[7.0].define(version: 2026_06_29_112854) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -100,6 +100,19 @@ ActiveRecord::Schema[7.0].define(version: 2026_06_28_205838) do
     t.index ["user_id"], name: "index_players_on_user_id"
   end
 
+  create_table "sessions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "campaign_id", null: false
+    t.uuid "user_id", null: false
+    t.string "title", null: false
+    t.text "notes"
+    t.integer "session_number"
+    t.date "played_on"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["campaign_id"], name: "index_sessions_on_campaign_id"
+    t.index ["user_id"], name: "index_sessions_on_user_id"
+  end
+
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "first_name", null: false
     t.string "last_name", null: false
@@ -129,4 +142,6 @@ ActiveRecord::Schema[7.0].define(version: 2026_06_28_205838) do
   add_foreign_key "players", "campaigns"
   add_foreign_key "players", "characters"
   add_foreign_key "players", "users"
+  add_foreign_key "sessions", "campaigns"
+  add_foreign_key "sessions", "users"
 end
