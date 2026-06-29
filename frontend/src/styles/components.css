@@ -168,3 +168,119 @@
     background: none;
     color: var(--color-text-muted);
   }
+
+  /* Rich Text Editor */
+  /* Tiptap editor */
+.ProseMirror {
+  outline: none;
+  color: var(--color-text);
+  line-height: 1.8;
+}
+
+.ProseMirror p { margin-bottom: 0.5rem; }
+.ProseMirror h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
+.ProseMirror h2 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+.ProseMirror h3 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+.ProseMirror ul, .ProseMirror ol { padding-left: 1.5rem; margin-bottom: 0.5rem; }
+.ProseMirror blockquote {
+  border-left: 3px solid var(--color-primary);
+  padding-left: 1rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin: 0.5rem 0;
+}
+
+/* Magic theme editor */
+body.theme-magic .ProseMirror {
+  color: #3d0a0a;
+  font-family: 'Philosopher', serif;
+  line-height: 2;
+}
+
+body.theme-magic .ProseMirror blockquote {
+  border-left-color: #6b1a1a;
+  color: #6b1a1a;
+}
+
+/* DOS theme editor */
+body.theme-dos .ProseMirror {
+  color: #00ff41;
+  font-family: 'Share Tech Mono', monospace;
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+}
+
+/* Tiptap editor */
+.ProseMirror {
+  outline: none;
+  color: var(--color-text);
+  line-height: 1.8;
+}
+
+.ProseMirror p { margin-bottom: 0.5rem; }
+.ProseMirror h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
+.ProseMirror h2 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+.ProseMirror h3 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+.ProseMirror ul, .ProseMirror ol { padding-left: 1.5rem; margin-bottom: 0.5rem; }
+.ProseMirror blockquote {
+  border-left: 3px solid var(--color-primary);
+  padding-left: 1rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin: 0.5rem 0;
+}
+
+/* Edit mode - white bg, dark text */
+.rich-text-edit-mode .ProseMirror {
+  color: #1a1a1a;
+  background: #ffffff;
+}
+
+.rich-text-edit-mode .ProseMirror h1,
+.rich-text-edit-mode .ProseMirror h2,
+.rich-text-edit-mode .ProseMirror h3,
+.rich-text-edit-mode .ProseMirror h4,
+.rich-text-edit-mode .ProseMirror h5,
+.rich-text-edit-mode .ProseMirror h6 {
+  color: #1a1a1a;
+}
+
+.rich-text-edit-mode .ProseMirror p {
+  color: #1a1a1a;
+}
+
+.rich-text-edit-mode .ProseMirror ul,
+.rich-text-edit-mode .ProseMirror ol {
+  color: #1a1a1a;
+}
+
+/* Magic theme editor */
+body.theme-magic .ProseMirror {
+  color: #3d0a0a;
+  font-family: 'Philosopher', serif;
+  line-height: 2;
+}
+
+body.theme-magic .ProseMirror h1,
+body.theme-magic .ProseMirror h2,
+body.theme-magic .ProseMirror h3 {
+  color: #6b1a1a;
+}
+
+body.theme-magic .ProseMirror blockquote {
+  border-left-color: #6b1a1a;
+  color: #6b1a1a;
+}
+
+/* DOS theme editor */
+body.theme-dos .ProseMirror {
+  color: #00ff41;
+  font-family: 'Share Tech Mono', monospace;
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+}
+
+body.theme-dos .ProseMirror h1,
+body.theme-dos .ProseMirror h2,
+body.theme-dos .ProseMirror h3 {
+  color: #00ff41;
+  text-shadow: 0 0 12px rgba(0, 255, 65, 0.6);
+}
