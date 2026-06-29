@@ -5,6 +5,7 @@ Rails.application.routes.draw do
       post 'auth/register', to: 'authentication#register'
       get 'campaigns/:campaign_id/players/:id/profile', to: 'players#profile'
       get 'campaigns/joined', to: 'campaigns#joined'
+      post 'characters/:id/migrate_inventory', to: 'characters#migrate_inventory'
       get 'users/search', to: 'users#search'
       resources :campaigns do
         resources :players, only: [:index, :show, :create, :update, :destroy] do

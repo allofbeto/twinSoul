@@ -10,7 +10,8 @@ class Api::V1::ItemsController < ApplicationController
   def create
     character = @current_user.characters.find(params[:character_id])
     inventory = character.inventory || character.create_inventory(user: @current_user)
-    item = inventory.items.build(item_params.merge(user: @current_user))
+    campaign_id = character.campaign_id
+    item = inventory.items.build(item_params.merge(user: @current_user, campaign_id: campaign_id))
     if item.save
       render json: item, status: :created
     else
@@ -40,6 +41,6 @@ class Api::V1::ItemsController < ApplicationController
   private
 
   def item_params
-    params.permit(:name, :notes, :attunement, :consumable, categories: [])
+    params.permit(:name, :notes, :attunement, :consumable, :campaign_id, categories: [])
   end
 end

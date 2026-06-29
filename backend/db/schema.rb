@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_06_28_195430) do
+ActiveRecord::Schema[7.0].define(version: 2026_06_28_205838) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -82,6 +82,8 @@ ActiveRecord::Schema[7.0].define(version: 2026_06_28_195430) do
     t.boolean "consumable"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.uuid "campaign_id"
+    t.index ["campaign_id"], name: "index_items_on_campaign_id"
     t.index ["inventory_id"], name: "index_items_on_inventory_id"
     t.index ["user_id"], name: "index_items_on_user_id"
   end
@@ -121,6 +123,7 @@ ActiveRecord::Schema[7.0].define(version: 2026_06_28_195430) do
   add_foreign_key "image_assets", "users"
   add_foreign_key "inventories", "characters"
   add_foreign_key "inventories", "users"
+  add_foreign_key "items", "campaigns"
   add_foreign_key "items", "inventories"
   add_foreign_key "items", "users"
   add_foreign_key "players", "campaigns"

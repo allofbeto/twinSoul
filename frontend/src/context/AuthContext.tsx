@@ -21,7 +21,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const applyTheme = (theme: string) => {
-  document.body.classList.remove('theme-default', 'theme-magic');
+  document.body.classList.remove('theme-default', 'theme-magic', 'theme-dos');
   document.body.classList.add(`theme-${theme}`);
 };
 

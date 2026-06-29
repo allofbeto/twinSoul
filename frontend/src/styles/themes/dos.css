@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
+
+body.theme-dos {
+  --color-primary: #00ff41;
+  --color-primary-hover: #00cc33;
+  --color-secondary: #00ff41;
+  --color-background: #0a0a0a;
+  --color-surface: #0d0d0d;
+  --color-surface-raised: #111111;
+  --color-text: #00ff41;
+  --color-text-muted: #007a1f;
+  --color-border: #003d0f;
+  --color-success: #00ff41;
+  --color-error: #ff0000;
+  --border-radius: 0px;
+  --font-primary: 'Share Tech Mono', monospace;
+  --font-heading: 'VT323', monospace;
+
+  background: #0a0a0a;
+}
+
+body.theme-dos h1 {
+  color: #00ff41;
+  text-shadow: 0 0 10px #00ff41, 0 0 20px #00ff41;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+body.theme-dos h2 {
+  color: #00ff41;
+  text-shadow: 0 0 8px #00ff41;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+body.theme-dos h3,
+body.theme-dos h4,
+body.theme-dos h5,
+body.theme-dos h6 {
+  color: #00ff41;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+body.theme-dos label {
+  font-family: 'Share Tech Mono', monospace;
+  color: #00ff41;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 0.8rem;
+}
+
+body.theme-dos button {
+  font-family: 'Share Tech Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-radius: 0;
+}
+
+body.theme-dos input,
+body.theme-dos select,
+body.theme-dos textarea {
+  font-family: 'Share Tech Mono', monospace;
+  border-radius: 0;
+  caret-color: #00ff41;
+}
+
+body.theme-dos *::-webkit-scrollbar-thumb {
+  background: #00ff41;
+}
+
+/* Scanline effect */
+body.theme-dos::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}

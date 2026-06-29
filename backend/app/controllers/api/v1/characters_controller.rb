@@ -73,6 +73,22 @@ class Api::V1::CharactersController < ApplicationController
     rescue ActiveRecord::RecordNotFound
       render json: { error: 'Character not found' }, status: :not_found
     end
+
+    def migrate_inventory
+      character = @current_user.characters.find(params[:id])
+      action = params[:action_type]
+      inventory = character.inventory
+    
+      if action == 'migrate'
+        Item.where(inventory_id: inventory.id).update_all(campaign_id: character.campaign_id)
+        render json: { message: 'Items migrated to campaign' }, status: :ok
+      elsif action == 'clear'
+        Item.where(inventory_id: inventory.id).delete_all
+        render json: { message: 'Inventory cleared' }, status: :ok
+      else
+        render json: { error: 'Invalid action' }, status: :unprocessable_entity
+      end
+    end
   
     private
   

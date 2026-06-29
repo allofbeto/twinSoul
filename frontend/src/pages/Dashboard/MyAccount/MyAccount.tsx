@@ -189,6 +189,24 @@ const MyAccount = () => {
             <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>✨</div>
             <small>Magic</small>
           </div>
+
+          <div
+            onClick={() => handleThemeChange('dos')}
+            style={{
+              cursor: 'pointer',
+              border: user?.theme === 'dos' ? '2px solid #00ff41' : '2px solid #003d0f',
+              borderRadius: '0px',
+              padding: '1rem 1.5rem',
+              background: '#0a0a0a',
+              color: '#00ff41',
+              textAlign: 'center',
+              minWidth: '120px',
+              fontFamily: 'monospace',
+            }}
+          >
+            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>💻</div>
+            <small>DOS</small>
+          </div>
         </div>
       </div>
 

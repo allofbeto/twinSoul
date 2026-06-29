@@ -31,7 +31,8 @@ class Api::V1::AuthenticationController < ApplicationController
         first_name: user.first_name,
         last_name: user.last_name,
         email: user.email,
-        phone: user.phone
+        phone: user.phone,
+        theme: user.theme
       }
     end
 end
