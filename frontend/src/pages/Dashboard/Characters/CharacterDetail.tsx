@@ -1,12 +1,18 @@
 import React, { useEffect, useState } from 'react';
+import {
+  Modal,
+  ModalBody,
+  ModalHeader,
+} from 'reactstrap';
 import { useAuth } from '../../../context/AuthContext';
 import { useParams } from 'react-router-dom';
-import { getCharacter, updateCharacter, createImageAsset } from '../../../api/backendHelpers';
+import { getCharacter, updateCharacter, createImageAsset, migrateInventory, getInventoryItems } from '../../../api/backendHelpers';
 import CharacterTopBar from './Components/CharacterTopBar';
 import AbilityScores from './Components/AbilityScores';
 import CharacterArtBox from './Components/CharacterArtBox';
 import CharacterSidebar from './Components/CharacterSidebar';
 import TabbedPanel from './Components/TabbedPanel';
+import MigrateInventory from '../../Items/MigrateItems';
 
 interface Character {
   id: string;
@@ -42,8 +48,76 @@ const CharacterDetail = () => {
   const [isDirty, setIsDirty] = useState(false);
   const [form, setForm] = useState<Character | null>(null);
 
+  const [pendingCampaignId, setPendingCampaignId]:any = useState("");
+
+  const [showModal, setShowModal]:any = useState(false);
+  const toggleModal = () => {
+    setShowModal(!showModal)
+  }
+  const [modalFunction, setModalFunction] = useState<string | null>(null);
+  const modalSwitch = (fn: string | null) => {
+    switch (modalFunction) {
+      case 'migrate_inventory':
+        return {
+          title: 'Existing Inventory Detected',
+          body: (
+            <MigrateInventory
+              onMigrate={async () => {
+                await migrateInventory(form!.id, 'migrate');
+                const updated = { ...form!, campaign_id: pendingCampaignId };
+                setForm(updated);
+                await saveCharacter({ campaign_id: pendingCampaignId });
+                setSuccess('Campaign updated!');
+                setIsDirty(false);
+                toggleModal();
+              }}
+              onClear={async () => {
+                await migrateInventory(form!.id, 'clear');
+                const updated = { ...form!, campaign_id: pendingCampaignId };
+                setForm(updated);
+                await saveCharacter({ campaign_id: pendingCampaignId });
+                setSuccess('Campaign updated!');
+                setIsDirty(false);
+                toggleModal();
+              }}
+              onCancel={() => {
+                toggleModal();
+              }}
+            />
+          ),
+        };
+      default:
+        return null;
+    }
+  };
+
   const { user } = useAuth();
   const isOwner = form?.user_id === user?.id;
+
+  const saveCharacter = async (overrides: Partial<Character> = {}) => {
+    const data = { ...form!, ...overrides };
+    await updateCharacter(id!, {
+      name: data.name,
+      race: data.race,
+      level: data.level,
+      max_hp: data.max_hp,
+      current_hp: data.current_hp,
+      armor_class: data.armor_class,
+      game: data.game,
+      strength: data.strength,
+      dexterity: data.dexterity,
+      constitution: data.constitution,
+      intelligence: data.intelligence,
+      wisdom: data.wisdom,
+      charisma: data.charisma,
+      classes: data.classes,
+      skills: data.skills,
+      profile_image_id: data.profile_image_id,
+      gold: data.gold,
+      inspo: data.inspo,
+      campaign_id: data.campaign_id,
+    });
+  };
 
   const [imageUrl, setImageUrl] = useState<string>(form?.profile_image_id || '');
   const handleImageUrlChange = async (url: string) => {
@@ -118,33 +192,30 @@ const CharacterDetail = () => {
     });
   };
 
+  const handleCampaignChange = async (newCampaignId: string | null) => {
+    try {
+      const res = await getInventoryItems(form!.id);
+      if (res.data.length > 0 && newCampaignId) {
+        setPendingCampaignId(newCampaignId);
+        setModalFunction('migrate_inventory');
+        setShowModal(true);
+      } else {
+        setForm({ ...form!, campaign_id: newCampaignId });
+        setIsDirty(true);
+      }
+    } catch {
+      setForm({ ...form!, campaign_id: newCampaignId });
+      setIsDirty(true);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError('');
     setSuccess('');
     try {
-      await updateCharacter(id!, {
-        name: form!.name,
-        race: form!.race,
-        level: form!.level,
-        max_hp: form!.max_hp,
-        current_hp: form!.current_hp,
-        armor_class: form!.armor_class,
-        game: form!.game,
-        strength: form!.strength,
-        dexterity: form!.dexterity,
-        constitution: form!.constitution,
-        intelligence: form!.intelligence,
-        wisdom: form!.wisdom,
-        charisma: form!.charisma,
-        classes: form!.classes,
-        skills: form!.skills,
-        profile_image_id: form!.profile_image_id,
-        gold: form!.gold,
-        inspo: form!.inspo,
-        campaign_id: form!.campaign_id,
-      });
+      await saveCharacter();
       setSuccess('Character updated!');
       setIsDirty(false);
     } catch (err: any) {
@@ -169,10 +240,7 @@ const CharacterDetail = () => {
           success={success}
           error={error}
           campaignId={form.campaign_id}
-          onCampaignChange={(id) => {
-            setForm({ ...form!, campaign_id: id });
-            setIsDirty(true);
-          }}
+          onCampaignChange={handleCampaignChange}
         />
   
         <div className="character-overview">
@@ -224,6 +292,15 @@ const CharacterDetail = () => {
           />
         </div>
       </form>
+
+      <Modal isOpen={showModal} toggle={toggleModal}>
+        <ModalHeader toggle={toggleModal}>
+          {modalSwitch(modalFunction)?.title}
+        </ModalHeader>
+        <ModalBody>
+          {modalSwitch(modalFunction)?.body}
+        </ModalBody>
+      </Modal>
     </div>
   );
 };

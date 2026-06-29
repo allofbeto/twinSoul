@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const parsedUser = JSON.parse(storedUser);
       setToken(storedToken);
       setUser(parsedUser);
-      applyTheme(parsedUser.theme || 'default');
+      applyTheme(parsedUser.theme);
     }
     setLoading(false);
   }, []);
@@ -55,7 +55,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
-    applyTheme('default');
   };
 
   const setTheme = (theme: string) => {

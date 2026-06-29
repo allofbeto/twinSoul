@@ -35,6 +35,8 @@ export const createItem = (data: object) => api.post('/items', data);
 export const updateItem = (id: string, data: object) => api.patch(`/items/${id}`, data);
 export const deleteItem = (id: string) => api.delete(`/items/${id}`);
 
+export const migrateInventory = (characterId: string, actionType: string) => api.post(`/characters/${characterId}/migrate_inventory`, { action_type: actionType });
+
 // Players
 export const getPlayers = (campaignId: string) => api.get(`/campaigns/${campaignId}/players`);
 export const addPlayer = (campaignId: string, data: object) => api.post(`/campaigns/${campaignId}/players`, data);
