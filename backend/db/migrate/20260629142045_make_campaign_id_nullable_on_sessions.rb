@@ -1,0 +1,5 @@
+class MakeCampaignIdNullableOnSessions < ActiveRecord::Migration[7.0]
+  def change
+    change_column_null :sessions, :campaign_id, true
+  end
+end

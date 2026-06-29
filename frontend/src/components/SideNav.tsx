@@ -8,6 +8,7 @@ const navItems = [
   { label: 'Characters', path: '/dashboard/characters' },
   { label: 'Campaigns', path: '/dashboard/campaigns' },
   { label: 'Items', path: '/dashboard/items' },
+  { label: 'Sessions', path: '/dashboard/sessions' },
 ];
 
 const SideNav = () => {

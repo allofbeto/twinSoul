@@ -15,6 +15,8 @@ import Home from './pages/Dashboard/Home/Home';
 import MyAccount from './pages/Dashboard/MyAccount/MyAccount';
 import PlayerProfile from './pages/Players/PlayerProfile';
 import ItemDetail from './pages/Dashboard/Items/ItemDetail';
+import Sessions from './pages/Dashboard/Sessions/Sessions';
+import SessionDetail from './pages/Dashboard/Sessions/SessionDetail';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
@@ -46,6 +48,8 @@ const App = () => {
             <Route path="campaigns/:id/players/:playerId" element={<PlayerProfile />} />
             <Route path="items" element={<Items />} />
             <Route path="items/:id" element={<ItemDetail />} />
+            <Route path="sessions" element={<Sessions />} />
+            <Route path="sessions/:id" element={<SessionDetail />} />
             <Route path="my_account" element={<MyAccount />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" />} />

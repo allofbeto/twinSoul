@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { getSessions, createSession, updateSession, deleteSession } from '../../../../api/backendHelpers';
-import { Modal, ModalHeader, ModalBody } from 'reactstrap';
-import RichTextEditor from '../../../../components/formComponents/RichTextEditor';
+// import { Modal, ModalHeader, ModalBody } from 'reactstrap';
+import SessionEditor from '../../../../components/formComponents/editor/SessionEditor';
+import { useNavigate } from 'react-router-dom';
 
 interface Session {
   id: string;
@@ -21,8 +22,8 @@ const CampaignSessions = ({ campaignId }: Props) => {
   const [loading, setLoading] = useState(true);
   const [openSession, setOpenSession] = useState<string | null>(null);
   const [editingSession, setEditingSession] = useState<Session | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [modalFunction, setModalFunction] = useState<string | null>(null);
+  // const [showModal, setShowModal] = useState(false);
+  // const [modalFunction, setModalFunction] = useState<string | null>(null);
   const [newSession, setNewSession] = useState({
     title: '',
     session_number: 1,
@@ -30,6 +31,8 @@ const CampaignSessions = ({ campaignId }: Props) => {
     notes: '',
     campaign_id: campaignId,
   });
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetch = async () => {
@@ -51,7 +54,22 @@ const CampaignSessions = ({ campaignId }: Props) => {
       const res = await createSession({ ...newSession, campaign_id: campaignId });
       setSessions((prev) => [...prev, res.data]);
       setNewSession({ title: '', session_number: sessions.length + 2, played_on: '', notes: '', campaign_id: campaignId });
-      setShowModal(false);
+      // setShowModal(false);
+    } catch {
+      console.error('Could not create session');
+    }
+  };
+
+  const handleCreateAndNavigate = async () => {
+    try {
+      const res = await createSession({
+        title: 'Untitled Session',
+        session_number: sessions.length + 1,
+        played_on: '',
+        notes: '',
+        campaign_id: campaignId,
+      });
+      navigate(`/dashboard/sessions/${res.data.id}`);
     } catch {
       console.error('Could not create session');
     }
@@ -77,61 +95,21 @@ const CampaignSessions = ({ campaignId }: Props) => {
     }
   };
 
-  const modalSwitch = (fn: string | null) => {
-    switch (fn) {
-      case 'new_session':
-        return {
-          title: 'New Session',
-          body: (
-            <div>
-              <div className="mb-3">
-                <label className="form-label text-muted-theme">Title</label>
-                <input
-                  type="text"
-                  className="form-control input-theme"
-                  value={newSession.title}
-                  onChange={(e) => setNewSession({ ...newSession, title: e.target.value })}
-                  placeholder="Session title..."
-                />
-              </div>
-              <div className="d-flex gap-2 mb-3">
-                <div style={{ flex: 1 }}>
-                  <label className="form-label text-muted-theme">Session #</label>
-                  <input
-                    type="number"
-                    className="form-control input-theme"
-                    value={newSession.session_number}
-                    onChange={(e) => setNewSession({ ...newSession, session_number: parseInt(e.target.value) })}
-                    min={1}
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label className="form-label text-muted-theme">Played On</label>
-                  <input
-                    type="date"
-                    className="form-control input-theme"
-                    value={newSession.played_on}
-                    onChange={(e) => setNewSession({ ...newSession, played_on: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="mb-3">
-                <label className="form-label text-muted-theme">Notes</label>
-                <RichTextEditor
-                  content={newSession.notes}
-                  onChange={(html) => setNewSession({ ...newSession, notes: html })}
-                />
-              </div>
-              <button type="button" className="btn btn-theme-primary" onClick={handleCreate}>
-                Create Session
-              </button>
-            </div>
-          ),
-        };
-      default:
-        return null;
-    }
-  };
+  // const modalSwitch = (fn: string | null) => {
+  //   switch (fn) {
+  //     case 'new_session':
+  //       return {
+  //         title: 'New Session',
+  //         body: (
+  //           <div>
+  //             woof
+  //           </div>
+  //         ),
+  //       };
+  //     default:
+  //       return null;
+  //   }
+  // };
 
   if (loading) return <p className="text-muted-theme">Loading...</p>;
 
@@ -142,7 +120,7 @@ const CampaignSessions = ({ campaignId }: Props) => {
         <button
           type="button"
           className="btn btn-theme-primary btn-sm"
-          onClick={() => { setModalFunction('new_session'); setShowModal(true); }}
+          onClick={handleCreateAndNavigate}
         >
           + New Session
         </button>
@@ -217,9 +195,10 @@ const CampaignSessions = ({ campaignId }: Props) => {
                         </div>
                         <div className="mb-3">
                           <label className="form-label text-muted-theme">Notes</label>
-                          <RichTextEditor
+                          <SessionEditor
                             content={current.notes || ''}
                             onChange={(html) => setEditingSession({ ...current, notes: html })}
+                            campaignId={campaignId}
                           />
                         </div>
                         <div className="d-flex gap-2">
@@ -255,14 +234,14 @@ const CampaignSessions = ({ campaignId }: Props) => {
         </div>
       )}
 
-      <Modal isOpen={showModal} toggle={() => setShowModal(false)}>
+      {/* <Modal isOpen={showModal} toggle={() => setShowModal(false)}>
         <ModalHeader toggle={() => setShowModal(false)}>
           {modalSwitch(modalFunction)?.title}
         </ModalHeader>
         <ModalBody>
           {modalSwitch(modalFunction)?.body}
         </ModalBody>
-      </Modal>
+      </Modal> */}
     </div>
   );
 };

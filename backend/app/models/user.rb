@@ -10,4 +10,5 @@ class User < ApplicationRecord
     has_many :image_assets, dependent: :destroy
     has_many :items, dependent: :destroy
     has_many :campaigns, dependent: :destroy
+    has_many :sessions, dependent: :destroy
 end

@@ -284,3 +284,50 @@ body.theme-dos .ProseMirror h3 {
   color: #00ff41;
   text-shadow: 0 0 12px rgba(0, 255, 65, 0.6);
 }
+
+.mention {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.85em;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.mention-character {
+  background: rgba(79, 70, 229, 0.2);
+  color: var(--color-primary);
+  border: 1px solid rgba(79, 70, 229, 0.4);
+}
+
+.mention-item {
+  background: rgba(124, 58, 237, 0.2);
+  color: var(--color-secondary);
+  border: 1px solid rgba(124, 58, 237, 0.4);
+}
+
+body.theme-magic .mention-character {
+  background: rgba(212, 175, 55, 0.2);
+  color: #d4af37;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+}
+
+body.theme-magic .mention-item {
+  background: rgba(139, 69, 19, 0.2);
+  color: #8b4513;
+  border: 1px solid rgba(139, 69, 19, 0.4);
+}
+
+body.theme-dos .mention-character {
+  background: rgba(0, 255, 65, 0.15);
+  color: #00ff41;
+  border: 1px solid rgba(0, 255, 65, 0.4);
+  text-shadow: 0 0 6px rgba(0, 255, 65, 0.5);
+}
+
+body.theme-dos .mention-item {
+  background: rgba(0, 200, 50, 0.15);
+  color: #00cc33;
+  border: 1px solid rgba(0, 200, 50, 0.4);
+}

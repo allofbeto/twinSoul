@@ -11,8 +11,8 @@ class Api::V1::SessionsController < ApplicationController
     end
   
     def create
-      campaign = @current_user.campaigns.find(params[:campaign_id])
-      session = campaign.sessions.build(session_params.merge(user: @current_user))
+      session = @current_user.sessions.build(session_params)
+      session.campaign_id = params[:campaign_id] if params[:campaign_id].present?
       if session.save
         render json: session, status: :created
       else
@@ -21,13 +21,14 @@ class Api::V1::SessionsController < ApplicationController
     end
   
     def update
-      campaign = @current_user.campaigns.find(params[:campaign_id])
-      session = campaign.sessions.find(params[:id])
+      session = @current_user.sessions.find(params[:id])
       if session.update(session_params)
         render json: session, status: :ok
       else
         render json: { errors: session.errors.full_messages }, status: :unprocessable_entity
       end
+      rescue ActiveRecord::RecordNotFound
+        render json: { error: 'Session not found' }, status: :not_found
     end
   
     def destroy

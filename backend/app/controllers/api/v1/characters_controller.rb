@@ -89,6 +89,14 @@ class Api::V1::CharactersController < ApplicationController
         render json: { error: 'Invalid action' }, status: :unprocessable_entity
       end
     end
+
+    def campaign_characters
+      campaign = Campaign.find(params[:campaign_id])
+      characters = Character.where(campaign_id: campaign.id)
+      render json: characters.as_json(include: { profile_image: { only: [:id, :url] } }), status: :ok
+      rescue ActiveRecord::RecordNotFound
+        render json: { error: 'Campaign not found' }, status: :not_found
+    end
   
     private
   
