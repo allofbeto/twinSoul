@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getSessions, updateSession, deleteSession } from '../../../api/backendHelpers';
 import SessionEditor from '../../../components/formComponents/editor/SessionEditor';
@@ -14,16 +14,23 @@ interface Session {
   played_on: string;
 }
 
+type SaveStatus = 'idle' | 'saving' | 'saved';
+
+const AUTOSAVE_DELAY = 500;
+
 const SessionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [form, setForm] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [showModal, setShowModal] = useState(false);
   const [modalFunction, setModalFunction] = useState<string | null>(null);
+
+  const formRef = useRef<Session | null>(null);
+  formRef.current = form;
 
   useEffect(() => {
     const fetch = async () => {
@@ -43,18 +50,32 @@ const SessionDetail = () => {
     fetch();
   }, [id]);
 
-  const handleSave = async () => {
-    if (!form) return;
-    setSaving(true);
+  const handleSave = useCallback(async () => {
+    const current = formRef.current;
+    if (!current) return;
     try {
-      const res = await updateSession(form.id, form);
+      const res = await updateSession(current.id, current);
       setSession(res.data);
       setIsDirty(false);
+      setSaveStatus('saved');
     } catch {
       console.error('Could not save session');
-    } finally {
-      setSaving(false);
+      setSaveStatus('idle');
     }
+  }, []);
+
+  // Autosave: fires .5s after the last change
+  useEffect(() => {
+    if (!isDirty || !form) return;
+    const timer = setTimeout(() => {
+      handleSave();
+    }, AUTOSAVE_DELAY);
+    return () => clearTimeout(timer);
+  }, [form, isDirty, handleSave]);
+
+  const markDirty = () => {
+    setIsDirty(true);
+    setSaveStatus('saving');
   };
 
   const handleDelete = async () => {
@@ -109,9 +130,9 @@ const SessionDetail = () => {
               <input
                 type="text"
                 className="stat-input-inline"
-                style={{ fontSize: '1.25rem', fontWeight: 700 }}
+                style={{ fontSize: '1.25rem', fontWeight: 700, width: '100%', textAlign: 'left' }}
                 value={form.title}
-                onChange={(e) => { setForm({ ...form, title: e.target.value }); setIsDirty(true); }}
+                onChange={(e) => { setForm({ ...form, title: e.target.value }); markDirty(); }}
               />
               <div className="d-flex gap-3 mt-1">
                 <input
@@ -119,7 +140,7 @@ const SessionDetail = () => {
                   className="stat-input-inline"
                   style={{ width: '60px', fontSize: '0.8rem' }}
                   value={form.session_number}
-                  onChange={(e) => { setForm({ ...form, session_number: parseInt(e.target.value) }); setIsDirty(true); }}
+                  onChange={(e) => { setForm({ ...form, session_number: parseInt(e.target.value) }); markDirty(); }}
                   min={0}
                 />
                 <input
@@ -127,21 +148,17 @@ const SessionDetail = () => {
                   className="stat-input-inline"
                   style={{ fontSize: '0.8rem' }}
                   value={form.played_on || ''}
-                  onChange={(e) => { setForm({ ...form, played_on: e.target.value }); setIsDirty(true); }}
+                  onChange={(e) => { setForm({ ...form, played_on: e.target.value }); markDirty(); }}
                 />
               </div>
             </div>
           </div>
-          <div className="d-flex gap-2">
-            {isDirty && (
-              <button
-                type="button"
-                className="btn btn-theme-primary btn-sm"
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving ? 'Saving...' : 'Save'}
-              </button>
+          <div className="d-flex align-items-center gap-2">
+            {saveStatus === 'saving' && (
+              <span className="save-status save-status-saving">Saving...</span>
+            )}
+            {saveStatus === 'saved' && (
+              <span className="save-status save-status-saved">Saved!</span>
             )}
             <button
               type="button"
@@ -158,7 +175,7 @@ const SessionDetail = () => {
       <div className="mt-3">
         <SessionEditor
           content={form.notes || ''}
-          onChange={(html) => { setForm({ ...form, notes: html }); setIsDirty(true); }}
+          onChange={(html) => { setForm({ ...form, notes: html }); markDirty(); }}
           campaignId={form.campaign_id || undefined}
         />
       </div>
