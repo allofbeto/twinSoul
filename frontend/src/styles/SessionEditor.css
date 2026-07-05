@@ -1,0 +1,181 @@
+/* ============================================
+   SessionEditor — document page canvas
+   ============================================ */
+
+   .session-editor {
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+  }
+  
+  /* --------------------------------------------
+     Toolbar — floats above the canvas, sticky
+     -------------------------------------------- */
+  
+  .editor-menu-bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background: var(--color-surface, #ffffff);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+  
+  .editor-menu-btn {
+    background: transparent;
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    padding: 0.2rem 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 400;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  
+  .editor-menu-btn:hover {
+    background: var(--color-bg-subtle, rgba(0, 0, 0, 0.04));
+  }
+  
+  .editor-menu-btn.is-active {
+    background: var(--color-primary);
+    color: #fff;
+    font-weight: 700;
+  }
+  
+  .editor-menu-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--color-border);
+    margin: 0 0.25rem;
+  }
+  
+  .editor-menu-hint {
+    margin-left: auto;
+    color: var(--color-text-muted);
+    font-size: 0.7rem;
+  }
+  
+  /* --------------------------------------------
+     Canvas — the muted desk the page sits on
+     -------------------------------------------- */
+  
+  .editor-canvas {
+    background: var(--editor-canvas-bg, var(--color-bg-subtle, #e9e7e2));
+    padding: 2rem 1rem 4rem;
+    min-height: 70vh;
+    border: 1px solid var(--color-border);
+    border-top: none;
+    border-bottom-left-radius: var(--border-radius);
+    border-bottom-right-radius: var(--border-radius);
+  }
+  
+  /* --------------------------------------------
+     Page — the sheet of paper
+     -------------------------------------------- */
+  
+  .editor-page {
+    max-width: 80%;              /* ~8.5in letter width */
+    margin: 0 auto;
+    background: var(--editor-page-bg, #ffffff);
+    color: var(--editor-page-text, #1f2430);
+    min-height: 1100px;            /* ~11in — feels like a real sheet */
+    padding: 96px 84px;            /* generous document margins */
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.12),
+      0 8px 24px rgba(0, 0, 0, 0.12);
+    border-radius: 2px;
+    cursor: text;
+  }
+  
+  /* Clicking anywhere on the page focuses the editor naturally
+     because ProseMirror fills the page; make it stretch: */
+  .editor-page .ProseMirror {
+    min-height: calc(1100px - 192px);
+    outline: none;
+  }
+  
+  /* Comfortable long-form reading rhythm on the page */
+  .editor-page .ProseMirror p {
+    line-height: 1.7;
+    margin-bottom: 0.75rem;
+  }
+  
+  .editor-page .ProseMirror h1,
+  .editor-page .ProseMirror h2,
+  .editor-page .ProseMirror h3 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .editor-page .ProseMirror blockquote {
+    border-left: 3px solid var(--color-primary);
+    padding-left: 1rem;
+    margin-left: 0;
+    color: var(--color-text-muted);
+  }
+  
+  /* --------------------------------------------
+     Read-only — clean page, no chrome
+     -------------------------------------------- */
+  
+  .session-editor-readonly {
+    max-width: 850px;
+    margin: 0 auto;
+  }
+  
+  /* --------------------------------------------
+     Responsive — page loses its "desk" on mobile
+     -------------------------------------------- */
+  
+  @media (max-width: 900px) {
+    .editor-canvas {
+      padding: 1rem 0.5rem 2rem;
+    }
+  
+    .editor-page {
+      padding: 48px 32px;
+      min-height: 60vh;
+    }
+  
+    .editor-page .ProseMirror {
+      min-height: 50vh;
+    }
+  }
+  
+  /* --------------------------------------------
+     Theme overrides
+     -------------------------------------------- */
+  
+  /* magic: parchment sheet on a dim arcane desk */
+  [data-theme='magic'] .editor-canvas {
+    --editor-canvas-bg: rgba(0, 0, 0, 0.35);
+  }
+  
+  [data-theme='magic'] .editor-page {
+    --editor-page-bg: #f3e9d2;
+    --editor-page-text: #2b2114;
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.4),
+      0 12px 32px rgba(0, 0, 0, 0.5);
+  }
+  
+  /* dos: terminal "page" — dark sheet, no paper skeuomorphism */
+  [data-theme='dos'] .editor-canvas {
+    --editor-canvas-bg: #000000;
+  }
+  
+  [data-theme='dos'] .editor-page {
+    --editor-page-bg: #0a0a0a;
+    --editor-page-text: var(--color-text, #33ff33);
+    border: 1px solid var(--color-border);
+    box-shadow: none;
+    border-radius: 0;
+  }
