@@ -6,7 +6,9 @@
     display: flex;
     flex-direction: column;
     border-radius: var(--border-radius);
-    overflow: hidden;
+    /* NOTE: no overflow: hidden here — it silently breaks position: sticky
+       for the toolbar and the outline rail (a sticky element only sticks
+       within its nearest overflow container, and this one never scrolls). */
   }
   
   /* --------------------------------------------
@@ -68,6 +70,9 @@
      -------------------------------------------- */
   
   .editor-canvas {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
     background: var(--editor-canvas-bg, var(--color-bg-subtle, #e9e7e2));
     padding: 2rem 1rem 4rem;
     min-height: 70vh;
@@ -77,17 +82,149 @@
     border-bottom-right-radius: var(--border-radius);
   }
   
+  .editor-page-wrap {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  /* --------------------------------------------
+     Outline rail — headings tree on the desk
+     -------------------------------------------- */
+  
+  .editor-outline {
+    position: sticky;
+    top: 72px;                     /* clears the sticky toolbar */
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-start;
+    max-height: calc(100vh - 96px);
+  }
+  
+  .editor-outline.is-open {
+    width: 220px;
+  }
+  
+  .outline-toggle {
+    background: var(--color-surface, #ffffff);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  
+  .outline-toggle:hover {
+    background: var(--color-bg-subtle, rgba(0, 0, 0, 0.04));
+  }
+  
+  .outline-body {
+    flex: 1;
+    min-width: 0;
+    margin-left: 0.5rem;
+    padding: 0.75rem;
+    background: var(--color-surface, rgba(255, 255, 255, 0.85));
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    overflow-y: auto;
+    max-height: calc(100vh - 96px);
+  }
+  
+  .outline-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin-bottom: 0.5rem;
+  }
+  
+  .outline-empty {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    line-height: 1.4;
+  }
+  
+  .outline-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  
+  .outline-item {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    border-radius: var(--border-radius);
+  }
+  
+  .outline-item.level-1 { padding-left: 0; }
+  .outline-item.level-2 { padding-left: 0.9rem; }
+  .outline-item.level-3 { padding-left: 1.8rem; }
+  
+  .outline-item.level-1 .outline-link { font-weight: 600; }
+  .outline-item.level-3 .outline-link { font-size: 0.75rem; }
+  
+  .outline-item.is-active {
+    background: var(--color-bg-subtle, rgba(0, 0, 0, 0.05));
+  }
+  
+  .outline-item.is-active .outline-link {
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+  
+  .outline-caret {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 0;
+    width: 16px;
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    transition: transform 0.15s ease;
+  }
+  
+  .outline-caret.is-collapsed {
+    transform: rotate(-90deg);
+  }
+  
+  .outline-caret-spacer {
+    width: 16px;
+    flex-shrink: 0;
+  }
+  
+  .outline-link {
+    background: transparent;
+    border: none;
+    color: var(--color-text, #333);
+    cursor: pointer;
+    text-align: left;
+    padding: 0.3rem 0.25rem;
+    font-size: 0.8rem;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .outline-link:hover {
+    color: var(--color-primary);
+  }
+  
   /* --------------------------------------------
      Page — the sheet of paper
      -------------------------------------------- */
   
   .editor-page {
-    max-width: 80%;              /* ~8.5in letter width */
+    max-width: 80%;              /* your preferred page width */
     margin: 0 auto;
     background: var(--editor-page-bg, #ffffff);
     color: var(--editor-page-text, #1f2430);
-    min-height: 1100px;            /* ~11in — feels like a real sheet */
-    padding: 96px 84px;            /* generous document margins */
     box-shadow:
       0 1px 3px rgba(0, 0, 0, 0.12),
       0 8px 24px rgba(0, 0, 0, 0.12);
@@ -95,10 +232,13 @@
     cursor: text;
   }
   
-  /* Clicking anywhere on the page focuses the editor naturally
-     because ProseMirror fills the page; make it stretch: */
+  /* Document margins live on .ProseMirror (not .editor-page) so the
+     Pagination extension can read them from computed style and stay
+     in sync with the responsive breakpoints below. */
   .editor-page .ProseMirror {
-    min-height: calc(1100px - 192px);
+    box-sizing: border-box;
+    padding: 96px 84px;            /* generous document margins */
+    min-height: 1100px;            /* one full sheet before content grows it */
     outline: none;
   }
   
@@ -123,6 +263,45 @@
   }
   
   /* --------------------------------------------
+     Page gaps — inserted by the Pagination extension
+     -------------------------------------------- */
+  
+  .page-gap {
+    user-select: none;
+    pointer-events: none;
+  }
+  
+  /* filler + top heights are set inline by the extension */
+  .page-gap-filler,
+  .page-gap-top {
+    width: 100%;
+  }
+  
+  /* The strip of desk between two sheets. Negative horizontal
+     margins (set inline to match the page padding) make it
+     full-bleed across the sheet. */
+  .page-gap-band {
+    position: relative;
+    background: var(--editor-canvas-bg, var(--color-bg-subtle, #e9e7e2));
+    box-shadow:
+      inset 0 10px 8px -8px rgba(0, 0, 0, 0.25),   /* bottom edge of sheet above */
+      inset 0 -10px 8px -8px rgba(0, 0, 0, 0.25);  /* top edge of sheet below */
+  }
+  
+  /* Page number label in the gap */
+  .page-gap-band::after {
+    content: 'Page ' attr(data-page);
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted, #8a8a8a);
+  }
+  
+  /* --------------------------------------------
      Read-only — clean page, no chrome
      -------------------------------------------- */
   
@@ -132,7 +311,7 @@
   }
   
   /* --------------------------------------------
-     Responsive — page loses its "desk" on mobile
+     Responsive — outline becomes an overlay on mobile
      -------------------------------------------- */
   
   @media (max-width: 900px) {
@@ -141,12 +320,31 @@
     }
   
     .editor-page {
-      padding: 48px 32px;
-      min-height: 60vh;
+      max-width: 100%;
     }
   
     .editor-page .ProseMirror {
-      min-height: 50vh;
+      padding: 48px 32px;
+    }
+  
+    .editor-outline {
+      position: static;
+      width: auto;
+    }
+  
+    .editor-outline.is-open {
+      width: auto;
+    }
+  
+    .editor-outline.is-open .outline-body {
+      position: fixed;
+      left: 0.5rem;
+      top: 90px;
+      bottom: 1rem;
+      width: 240px;
+      z-index: 50;
+      margin-left: 0;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
     }
   }
   
@@ -167,6 +365,12 @@
       0 12px 32px rgba(0, 0, 0, 0.5);
   }
   
+  /* the gap band needs a solid color here — the canvas override is a
+     translucent black that would show white paper through it */
+  [data-theme='magic'] .editor-page .page-gap-band {
+    background: #241c10;
+  }
+  
   /* dos: terminal "page" — dark sheet, no paper skeuomorphism */
   [data-theme='dos'] .editor-canvas {
     --editor-canvas-bg: #000000;
@@ -178,4 +382,10 @@
     border: 1px solid var(--color-border);
     box-shadow: none;
     border-radius: 0;
+  }
+  
+  [data-theme='dos'] .editor-page .page-gap-band {
+    box-shadow: none;
+    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
   }

@@ -7,6 +7,7 @@ import Mention from '@tiptap/extension-mention';
 import { getCampaignCharacters, getItems } from '../../../api/backendHelpers';
 import { createSuggestion } from './MentionSuggestion';
 import { Pagination } from './Pagination';
+import EditorOutline from './EditorOutline';
 import '../../../styles/SessionEditor.css'
 
 interface Props {
@@ -116,8 +117,11 @@ const SessionEditor = ({ content, onChange, readOnly = false, campaignId }: Prop
     <div className="session-editor rich-text-edit-mode">
       <MenuBar editor={editor} />
       <div className="editor-canvas">
-        <div className="editor-page">
-          <EditorContent editor={editor} />
+        <EditorOutline editor={editor} />
+        <div className="editor-page-wrap">
+          <div className="editor-page">
+            <EditorContent editor={editor} />
+          </div>
         </div>
       </div>
     </div>
