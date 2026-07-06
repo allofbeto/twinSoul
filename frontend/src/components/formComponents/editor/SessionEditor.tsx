@@ -4,6 +4,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import Mention from '@tiptap/extension-mention';
+import { TextStyle, Color } from '@tiptap/extension-text-style';
 import { getCampaignCharacters, getItems } from '../../../api/backendHelpers';
 import { createSuggestion } from './MentionSuggestion';
 import { Pagination } from './Pagination';
@@ -17,6 +18,17 @@ interface Props {
     campaignId?: string;
 }
 
+const FONT_COLORS = [
+  { label: 'Default', value: '' },
+  { label: 'Crimson', value: '#c0392b' },
+  { label: 'Ember', value: '#e67e22' },
+  { label: 'Gold', value: '#b8860b' },
+  { label: 'Forest', value: '#1e8449' },
+  { label: 'Arcane', value: '#6c3fc5' },
+  { label: 'Frost', value: '#2471a3' },
+  { label: 'Shadow', value: '#5d6d7e' },
+];
+
 const MenuBar = ({ editor }: { editor: any }) => {
   if (!editor) return null;
 
@@ -29,6 +41,8 @@ const MenuBar = ({ editor }: { editor: any }) => {
       {label}
     </button>
   );
+
+  const currentColor = editor.getAttributes('textStyle').color || '';
 
   return (
     <div className="editor-menu-bar">
@@ -48,6 +62,38 @@ const MenuBar = ({ editor }: { editor: any }) => {
       {btn(() => editor.chain().focus().setTextAlign('left').run(), '⬅', editor.isActive({ textAlign: 'left' }))}
       {btn(() => editor.chain().focus().setTextAlign('center').run(), '↔', editor.isActive({ textAlign: 'center' }))}
       {btn(() => editor.chain().focus().setTextAlign('right').run(), '➡', editor.isActive({ textAlign: 'right' }))}
+      <div className="editor-menu-divider" />
+      <div className="editor-color-group">
+        {FONT_COLORS.map((c) =>
+          c.value === '' ? (
+            <button
+              key="default"
+              type="button"
+              className="editor-color-swatch editor-color-unset"
+              title="Default color"
+              onClick={() => editor.chain().focus().unsetColor().run()}
+            >
+              ✕
+            </button>
+          ) : (
+            <button
+              key={c.value}
+              type="button"
+              className={`editor-color-swatch ${currentColor === c.value ? 'is-active' : ''}`}
+              title={c.label}
+              style={{ backgroundColor: c.value }}
+              onClick={() => editor.chain().focus().setColor(c.value).run()}
+            />
+          )
+        )}
+        <input
+          type="color"
+          className="editor-color-picker"
+          title="Custom color"
+          value={currentColor || '#000000'}
+          onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
+        />
+      </div>
       <div className="editor-menu-divider" />
       {btn(() => editor.chain().focus().undo().run(), '↩')}
       {btn(() => editor.chain().focus().redo().run(), '↪')}
@@ -84,6 +130,8 @@ const SessionEditor = ({ content, onChange, readOnly = false, campaignId }: Prop
     extensions: [
       StarterKit,
       Underline,
+      TextStyle,
+      Color,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Mention.configure({
         HTMLAttributes: { class: 'mention mention-character' },

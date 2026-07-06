@@ -389,3 +389,46 @@
     border-top: 1px solid var(--color-border);
     border-bottom: 1px solid var(--color-border);
   }
+
+  .editor-color-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  .editor-color-swatch {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.1s ease;
+  }
+  
+  .editor-color-swatch:hover {
+    transform: scale(1.15);
+  }
+  
+  .editor-color-swatch.is-active {
+    outline: 2px solid currentColor;
+    outline-offset: 1px;
+  }
+  
+  .editor-color-unset {
+    background: transparent;
+    font-size: 10px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .editor-color-picker {
+    width: 22px;
+    height: 22px;
+    border: none;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+  }
