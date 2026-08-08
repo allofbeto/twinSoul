@@ -25,13 +25,10 @@
 .sidenav-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
 }
 
 .sidenav-collapsed .sidenav-header {
-  flex-direction: column;
-  gap: 12px;
+  justify-content: center;
 }
 
 .sidenav-brand {
@@ -68,35 +65,6 @@
 
 .sidenav-collapsed .brand-mark {
   display: block;
-}
-
-/* Toggle button */
-.sidenav-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-  border: none;
-  background: none;
-  border-radius: var(--border-radius);
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.sidenav-toggle:hover {
-  background-color: var(--color-surface-raised);
-  color: var(--color-text);
-}
-
-.sidenav-toggle i {
-  font-size: 1.2rem;
-}
-
-.sidenav-mobile-drawer .sidenav-toggle {
-  display: none;
 }
 
 /* Nav links */
@@ -137,13 +105,11 @@
 }
 
 /* Tooltips (collapsed only) */
-.sidenav-collapsed .nav-link-theme,
-.sidenav-collapsed .sidenav-toggle {
+.sidenav-collapsed .nav-link-theme {
   position: relative;
 }
 
-.sidenav-collapsed .nav-link-theme::after,
-.sidenav-collapsed .sidenav-toggle::after {
+.sidenav-collapsed .nav-link-theme::after {
   content: attr(data-tooltip);
   position: absolute;
   left: calc(100% + 10px);
@@ -162,8 +128,7 @@
   z-index: 200;
 }
 
-.sidenav-collapsed .nav-link-theme:hover::after,
-.sidenav-collapsed .sidenav-toggle:hover::after {
+.sidenav-collapsed .nav-link-theme:hover::after {
   opacity: 1;
 }
 
