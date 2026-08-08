@@ -17,6 +17,7 @@ import PlayerProfile from './pages/Players/PlayerProfile';
 import ItemDetail from './pages/Dashboard/Items/ItemDetail';
 import Sessions from './pages/Dashboard/Sessions/Sessions';
 import SessionDetail from './pages/Dashboard/Sessions/SessionDetail';
+import SessionTheatre from './pages/Dashboard/Theatre/SessionTheatre';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
@@ -49,6 +50,7 @@ const App = () => {
             <Route path="items" element={<Items />} />
             <Route path="items/:id" element={<ItemDetail />} />
             <Route path="sessions" element={<Sessions />} />
+            <Route path="theatre" element={<SessionTheatre />} />
             <Route path="sessions/:id" element={<SessionDetail />} />
             <Route path="my_account" element={<MyAccount />} />
           </Route>

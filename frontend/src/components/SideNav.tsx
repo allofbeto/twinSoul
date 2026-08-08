@@ -19,6 +19,11 @@ const navItems: NavItem[] = [
     icon: "home",
   },
   {
+    label: "Theatre",
+    path: "/dashboard/theatre",
+    icon: "theatre",
+  },
+  {
     label: "Characters",
     path: "/dashboard/characters",
     icon: "characters",
