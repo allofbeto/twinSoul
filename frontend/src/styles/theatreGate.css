@@ -1,0 +1,256 @@
+/* ============================================================ *
+ * Campaign gate
+ * ============================================================ */
+
+ .theatre--gate {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100%;
+    height: 100%;
+  }
+  
+  .theatre__gate {
+    position: relative;
+    width: 100%;
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    box-sizing: border-box;
+  }
+  
+  .theatre__gate-exit {
+    position: absolute;
+    top: 1.25rem;
+    left: 1.25rem;
+  }
+  
+  .theatre__gate-panel {
+    width: 100%;
+    max-width: 30rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 2rem;
+    border-radius: 14px;
+    border: 1px solid var(--theatre-border, rgba(255, 255, 255, 0.12));
+    background: var(--theatre-surface, rgba(20, 22, 30, 0.72));
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+    box-sizing: border-box;
+  }
+  
+  .theatre__gate-title {
+    margin: 0;
+    font-size: 1.5rem;
+    line-height: 1.2;
+    color: var(--theatre-text, #f4f4f6);
+  }
+  
+  .theatre__gate-sub {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    color: var(--theatre-text-dim, rgba(244, 244, 246, 0.62));
+  }
+  
+  .theatre__gate-create,
+  .theatre__gate-pick {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  
+  .theatre__gate-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 18rem;
+    overflow-y: auto;
+  }
+  
+  .theatre__gate-item {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    text-align: left;
+    padding: 0.75rem 0.9rem;
+    border-radius: 10px;
+    border: 1px solid var(--theatre-border, rgba(255, 255, 255, 0.1));
+    background: var(--theatre-surface-2, rgba(255, 255, 255, 0.04));
+    color: var(--theatre-text, #f4f4f6);
+    cursor: pointer;
+    transition: border-color 120ms ease, background 120ms ease, transform 80ms ease;
+  }
+  
+  .theatre__gate-item:hover {
+    border-color: var(--theatre-accent, #8b7bd8);
+    background: var(--theatre-surface-3, rgba(255, 255, 255, 0.08));
+  }
+  
+  .theatre__gate-item:active {
+    transform: translateY(1px);
+  }
+  
+  .theatre__gate-item-name {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  
+  .theatre__gate-item-desc {
+    font-size: 0.82rem;
+    color: var(--theatre-text-dim, rgba(244, 244, 246, 0.6));
+  }
+  
+  .theatre__gate-actions {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: flex-end;
+  }
+  
+  .theatre__gate-error {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--theatre-danger, #e5706b);
+  }
+  
+  .theatre__gate-loading {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--theatre-text-dim, rgba(244, 244, 246, 0.62));
+  }
+  
+  /* --- DOS theme --- */
+  .theatre--dos.theatre--gate .theatre__gate-panel {
+    border-radius: 0;
+    border: 2px solid var(--theatre-border, #55ff55);
+    background: var(--theatre-surface, #0a0a0a);
+    box-shadow: none;
+    font-family: var(--theatre-font-mono, "Courier New", monospace);
+  }
+  
+  .theatre--dos .theatre__gate-item {
+    border-radius: 0;
+  }
+  
+  /* ============================================================ *
+ * Campaign gate — MAGIC theme
+ * ============================================================ */
+
+.theatre--magic .theatre__gate-panel {
+    border-radius: 16px;
+    border: 1px solid #c9a961;
+    background:
+      radial-gradient(130% 150% at 50% 0%, rgba(201, 169, 97, 0.18), transparent 60%),
+      rgba(18, 14, 32, 0.9);
+    box-shadow: 0 0 44px rgba(201, 169, 97, 0.2), 0 24px 60px rgba(0, 0, 0, 0.5);
+    color: #f2ecff;
+  }
+  
+  .theatre--magic .theatre__gate-title {
+    color: #e9d9a0;
+  }
+  
+  .theatre--magic .theatre__gate-sub,
+  .theatre--magic .theatre__gate-loading {
+    color: rgba(242, 236, 255, 0.66);
+  }
+  
+  .theatre--magic .theatre__gate-item {
+    border-radius: 12px;
+    border: 1px solid rgba(201, 169, 97, 0.35);
+    background: rgba(201, 169, 97, 0.06);
+    color: #f2ecff;
+  }
+  
+  .theatre--magic .theatre__gate-item:hover {
+    border-color: #c9a961;
+    background: rgba(201, 169, 97, 0.14);
+    box-shadow: 0 0 18px rgba(201, 169, 97, 0.28);
+  }
+  
+  .theatre--magic .theatre__gate-error {
+    color: #ff8a84;
+  }
+
+  .theatre__gate-empty {
+    padding: 0.75rem 0.9rem;
+    font-size: 0.88rem;
+    opacity: 0.6;
+    list-style: none;
+  }
+
+  /* Replace your existing .theatre__gate-list — gap removed, spacing now per-row */
+.theatre__gate-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    max-height: 18rem;
+    overflow-y: auto;
+  }
+  
+  /* Animated row wrapper. Collapses height + fades when filtered out. */
+  .theatre__gate-item-row {
+    max-height: 8rem;
+    margin-bottom: 0.5rem;
+    opacity: 1;
+    transform: translateY(0);
+    overflow: hidden;
+    transition:
+      max-height 240ms ease,
+      opacity 160ms ease,
+      transform 240ms ease,
+      margin-bottom 240ms ease;
+  }
+  
+  .theatre__gate-item-row.is-hidden {
+    max-height: 0;
+    margin-bottom: 0;
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+  }
+  
+  /* Empty-match line — same collapse treatment so it eases in/out */
+  .theatre__gate-empty {
+    max-height: 4rem;
+    padding: 0.75rem 0.9rem;
+    font-size: 0.88rem;
+    opacity: 0.6;
+    list-style: none;
+    overflow: hidden;
+    transition: max-height 240ms ease, opacity 160ms ease, padding 240ms ease;
+  }
+  
+  .theatre__gate-empty.is-hidden {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  
+  /* Respect users who ask for less motion */
+  @media (prefers-reduced-motion: reduce) {
+    .theatre__gate-item-row,
+    .theatre__gate-empty {
+      transition: none;
+    }
+  }
+
+  .theatre__gate-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    height: 18rem;
+    overflow-y: auto;
+  }
