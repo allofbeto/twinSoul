@@ -19,6 +19,7 @@ export interface Campaign {
   id: string;
   name: string;
   description?: string;
+  role?: 'owner' | 'player';
 }
 
 export interface RevealAsset {
@@ -43,28 +44,28 @@ export interface Combatant {
   isEnemy?: boolean;
 }
 
+export interface Session {
+  id: string;
+  campaignId: string;
+  title: string;
+  notes?: string;          // plain text (sessions.notes)
+  sessionNumber?: number;  // sessions.session_number
+  playedOn?: string;       // sessions.played_on (date)
+  updatedAt?: string;
+}
+
 export interface SessionTheatreProps {
   sessionTitle?: string;
   campaignName?: string;
-  /** Rendered Tiptap output as an HTML string. */
-  notesHtml?: string;
-  /** …or pass your own rendered notes node instead of notesHtml. */
+  /** …pass your own rendered notes node to override the session's notes. */
   notes?: ReactNode;
   assets?: RevealAsset[];
   /** Optional override. Defaults to the signed-in user's theme (users.theme). */
   theme?: string;
   onExit?: () => void;
-
-  /* --- Campaign gate --- */
-  /** Existing campaigns to choose from. Empty → the gate opens on the create form. */
-  campaigns?: Campaign[];
-  /** True while campaigns are still being fetched — the gate shows a loading state. */
-  campaignsLoading?: boolean;
-  /** Create a campaign (POST to your API) and resolve with the created record. */
-  onCreateCampaign?: (name: string) => Promise<Campaign> | Campaign;
   /** Pass a campaign to skip the gate and go straight to the stage. */
   activeCampaign?: Campaign | null;
-  /** Fired when a campaign is chosen or created — lets the parent load its assets/notes. */
+  /** Fired when a campaign is chosen or created. */
   onCampaignSelected?: (campaign: Campaign) => void;
 }
 

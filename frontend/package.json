@@ -20,6 +20,7 @@
     "axios": "^1.18.1",
     "bootstrap": "^5.3.8",
     "boxicons": "^2.1.4",
+    "dompurify": "^3.4.13",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^6.30.4",
@@ -55,6 +56,7 @@
     ]
   },
   "devDependencies": {
+    "@types/dompurify": "^3.0.5",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/react-router-dom": "^5.3.3",

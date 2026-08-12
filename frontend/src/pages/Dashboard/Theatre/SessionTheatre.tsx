@@ -5,8 +5,9 @@ import type {
   PointerEvent as ReactPointerEvent,
   ReactNode,
 } from 'react';
+import DOMPurify from 'dompurify';
 import { useAuth } from '../../../context/AuthContext';
-import { getCampaigns, createCampaign } from '../../../api/backendHelpers'; // ← adjust to your helpers' path
+import { getCampaigns, createCampaign, getSessions, createSession } from '../../../api/backendHelpers'; // ← adjust path
 import '../../../styles/SessionTheatre.css';
 import '../../../styles/theatreGate.css';
 
@@ -17,11 +18,13 @@ import type {
   DmPanel,
   RevealAsset,
   RollResult,
+  Session,
   SessionTheatreProps,
 } from './Components/types';
 import { PANE_DEFAULT, PANE_MAX, PANE_MIN, clamp, coerceTheme } from './Components/types';
 import { rollExpression } from './Components/dice';
 import CampaignGate from './Components/CampaignGate';
+import SessionPicker from './Components/SessionPicker';
 import Curtain from './Components/Curtain';
 import ResizeHandle from './Components/ResizeHandle';
 import Stage from './Components/Stage';
@@ -34,30 +37,51 @@ import ScratchPanel from './Components/ScratchPanel';
 let idSeed = 0;
 const nextId = () => `c${(idSeed += 1)}`;
 
+// Sanitize Tiptap HTML while keeping the bits Tiptap relies on:
+// link target/rel, and mention data-* attributes.
+const NOTES_SANITIZE_CONFIG = {
+  ADD_ATTR: ['target', 'rel', 'data-type', 'data-id', 'data-label', 'data-mention-suggestion-char'],
+};
+const renderNotes = (html: string) => DOMPurify.sanitize(html, NOTES_SANITIZE_CONFIG);
+
+// Maps raw sessions JSON → Session. One place to edit if the serializer changes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeSession(raw: any): Session {
+  return {
+    id: String(raw.id),
+    campaignId: String(raw.campaign_id ?? ''),
+    title: raw.title ?? 'Untitled session',
+    notes: raw.notes ?? undefined,
+    sessionNumber: raw.session_number ?? undefined,
+    playedOn: raw.played_on ?? undefined,
+    updatedAt: raw.updated_at ?? undefined,
+  };
+}
+
 export default function SessionTheatre({
   sessionTitle = 'Untitled session',
   campaignName,
-  notesHtml,
   notes,
   assets = [],
   theme,
   onExit,
-  // Pass `activeCampaign` to skip the gate and go straight to the stage.
-  // Otherwise the theatre fetches campaigns itself and gates on entry.
   activeCampaign = null,
   onCampaignSelected,
 }: SessionTheatreProps) {
-  // Theme comes from the signed-in user (users.theme). The optional `theme`
-  // prop overrides it if you ever need to; otherwise it's fully automatic.
   const { user } = useAuth();
   const activeTheme = coerceTheme(theme ?? user?.theme);
 
-  // Which campaign we're running. Null → show the gate before the theatre.
+  // Which campaign we're running. Null → show the campaign gate.
   const [selected, setSelected] = useState<Campaign | null>(activeCampaign);
 
-  // Campaign list for the gate — fetched on mount unless we already have one.
+  // Campaign list for the gate.
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(!activeCampaign);
+
+  // Sessions for the selected campaign (owner path only).
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [activeSession, setActiveSession] = useState<Session | null>(null);
 
   useEffect(() => {
     if (activeCampaign) return;
@@ -69,6 +93,19 @@ export default function SessionTheatre({
     return () => { alive = false; };
   }, [activeCampaign]);
 
+  // Fetch this campaign's sessions once a campaign is chosen (owners only).
+  useEffect(() => {
+    if (!selected || selected.role === 'player') return;
+    let alive = true;
+    setSessionsLoading(true);
+    setActiveSession(null);
+    getSessions(selected.id)
+      .then((res) => { if (alive) setSessions(res.data.map(normalizeSession)); })
+      .catch(() => { if (alive) setSessions([]); })
+      .finally(() => { if (alive) setSessionsLoading(false); });
+    return () => { alive = false; };
+  }, [selected]);
+
   const handleCreateCampaign = useCallback(async (name: string): Promise<Campaign> => {
     const res = await createCampaign({ name });
     const created: Campaign = res.data;
@@ -76,7 +113,15 @@ export default function SessionTheatre({
     return created;
   }, []);
 
-  // Resizable panes. Stage flexes to fill whatever the rails don't take.
+  const handleCreateSession = useCallback(async (title: string): Promise<Session> => {
+    if (!selected) throw new Error('No campaign selected.');
+    const res = await createSession({ title, campaign_id: selected.id });
+    const created = normalizeSession(res.data);
+    setSessions((prev) => [created, ...prev]);
+    return created;
+  }, [selected]);
+
+  // Resizable panes.
   const [notesW, setNotesW] = useState(PANE_DEFAULT);
   const [trayW, setTrayW] = useState(PANE_DEFAULT);
   const dragRef = useRef<{ kind: 'notes' | 'tray'; startX: number; startW: number } | null>(null);
@@ -213,8 +258,12 @@ export default function SessionTheatre({
 
   const togglePanel = useCallback((p: DmPanel) => setPanel((cur) => (cur === p ? null : p)), []);
 
-  // Gate: choose or create a campaign before the stage opens.
-  // Rendered after every hook above so hook order stays stable when `selected` flips.
+  // Notes shown come from the active session, unless a `notes` node was passed.
+  const effectiveNotes = activeSession?.notes ?? undefined;
+
+  // --- gates (all after the hooks above, so hook order stays stable) ---
+
+  // 1) Choose / create a campaign.
   if (!selected) {
     return (
       <CampaignGate
@@ -228,22 +277,71 @@ export default function SessionTheatre({
     );
   }
 
+  // 2) Player guard — read-only stage, no notes/tray/tools.
+  if (selected.role === 'player') {
+    return (
+      <div
+        className={`theatre theatre--${activeTheme} theatre--player`}
+        style={rootStyle}
+        role="application"
+        aria-label="Session stage"
+      >
+        <header className="theatre__curtain">
+          <div className="theatre__curtain-left">
+            {onExit && (
+              <button type="button" className="theatre__icon-btn" onClick={onExit} aria-label="Exit theatre">
+                ‹ Exit
+              </button>
+            )}
+          </div>
+          <div className="theatre__title">
+            <span className="theatre__title-main">{sessionTitle}</span>
+            {(selected.name ?? campaignName) && (
+              <span className="theatre__title-sub">{selected.name ?? campaignName}</span>
+            )}
+          </div>
+          <div className="theatre__curtain-right" />
+        </header>
+
+        <div className="theatre__body">
+          <Stage stage={stage} onClear={clearStage} readOnly />
+        </div>
+      </div>
+    );
+  }
+
+  // 3) Choose / create a session for this campaign (owner path).
+  if (!activeSession) {
+    return (
+      <SessionPicker
+        campaignName={selected.name ?? campaignName ?? 'this campaign'}
+        sessions={sessions}
+        loading={sessionsLoading}
+        theme={theme}
+        onSelect={setActiveSession}
+        onCreate={handleCreateSession}
+        onBack={() => setSelected(null)}
+        onExit={onExit}
+      />
+    );
+  }
+
+  // 4) Full owner theatre.
   let notesBody: ReactNode;
   if (notes) {
     notesBody = notes;
-  } else if (notesHtml) {
+  } else if (effectiveNotes) {
     notesBody = (
       <div
         className="theatre__notes-html"
-        // Tiptap already produces sanitized HTML in your editor.
-        dangerouslySetInnerHTML={{ __html: notesHtml }}
+        dangerouslySetInnerHTML={{ __html: renderNotes(effectiveNotes) }}
       />
     );
   } else {
     notesBody = (
       <div className="theatre__notes-empty">
-        <p className="theatre__notes-empty-title">No notes loaded</p>
-        <p className="theatre__notes-empty-hint">Your session notes will appear here.</p>
+        <p className="theatre__notes-empty-title">No notes yet</p>
+        <p className="theatre__notes-empty-hint">This session doesn’t have notes yet.</p>
       </div>
     );
   }
@@ -251,7 +349,7 @@ export default function SessionTheatre({
   return (
     <div className={`theatre theatre--${activeTheme}`} style={rootStyle} role="application" aria-label="Session theatre">
       <Curtain
-        sessionTitle={sessionTitle}
+        sessionTitle={activeSession.title ?? sessionTitle}
         campaignName={selected.name ?? campaignName}
         notesOpen={notesOpen}
         trayOpen={trayOpen}

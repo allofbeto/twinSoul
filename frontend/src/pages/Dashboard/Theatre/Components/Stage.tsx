@@ -3,9 +3,10 @@ import type { RevealAsset } from './types';
 interface StageProps {
   stage: RevealAsset | null;
   onClear: () => void;
+  readOnly?: boolean;
 }
 
-export default function Stage({ stage, onClear }: StageProps) {
+export default function Stage({ stage, onClear, readOnly = false }: StageProps) {
   return (
     <main className="theatre__stage" aria-label="Stage">
       {stage ? (
@@ -15,9 +16,11 @@ export default function Stage({ stage, onClear }: StageProps) {
               <h2 className="theatre__scene-title">{stage.title}</h2>
               {stage.subtitle && <p className="theatre__scene-sub">{stage.subtitle}</p>}
             </div>
-            <button type="button" className="theatre__icon-btn" onClick={onClear}>
-              Clear stage
-            </button>
+            {!readOnly && (
+              <button type="button" className="theatre__icon-btn" onClick={onClear}>
+                Clear stage
+              </button>
+            )}
           </div>
 
           {stage.imageUrl && (
@@ -38,7 +41,11 @@ export default function Stage({ stage, onClear }: StageProps) {
         <div className="theatre__empty">
           <p className="theatre__empty-mark">✦</p>
           <p className="theatre__empty-text">The stage is dark.</p>
-          <p className="theatre__empty-hint">Pick something from the tray to reveal it.</p>
+          <p className="theatre__empty-hint">
+            {readOnly
+              ? 'Waiting for the DM to reveal something.'
+              : 'Pick something from the tray to reveal it.'}
+          </p>
         </div>
       )}
     </main>

@@ -2,7 +2,20 @@ class Api::V1::CampaignsController < ApplicationController
     include Authenticatable
   
     def index
-      render json: @current_user.campaigns, status: :ok
+      owned_ids  = @current_user.campaigns.pluck(:id)
+      played_ids = Campaign.joins(:players)
+                           .where(players: { user_id: @current_user.id, active: true })
+                           .pluck(:id)
+    
+      ids       = (owned_ids + played_ids).uniq
+      campaigns = Campaign.where(id: ids)
+      owned_set = owned_ids.to_set
+    
+      json = campaigns.map do |c|
+        c.as_json.merge(role: owned_set.include?(c.id) ? 'owner' : 'player')
+      end
+    
+      render json: json, status: :ok
     end
   
     def show

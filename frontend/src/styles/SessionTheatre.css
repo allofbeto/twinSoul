@@ -355,3 +355,15 @@
     .theatre__handle { display: none; }
     .theatre__stage { min-height: 320px; }
   }
+
+  .theatre__notes-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    font-family: inherit;
+  }
+
+  .theatre__notes {
+    background: #f5ecd7; /* creamy beige */
+    color: #2b2620;      /* dark ink so text stays readable on the light bg */
+  }
