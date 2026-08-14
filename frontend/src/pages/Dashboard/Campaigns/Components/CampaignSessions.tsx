@@ -22,15 +22,6 @@ const CampaignSessions = ({ campaignId }: Props) => {
   const [loading, setLoading] = useState(true);
   const [openSession, setOpenSession] = useState<string | null>(null);
   const [editingSession, setEditingSession] = useState<Session | null>(null);
-  // const [showModal, setShowModal] = useState(false);
-  // const [modalFunction, setModalFunction] = useState<string | null>(null);
-  const [newSession, setNewSession] = useState({
-    title: '',
-    session_number: 1,
-    played_on: '',
-    notes: '',
-    campaign_id: campaignId,
-  });
 
   const navigate = useNavigate();
 
@@ -47,18 +38,6 @@ const CampaignSessions = ({ campaignId }: Props) => {
     };
     fetch();
   }, [campaignId]);
-
-  const handleCreate = async () => {
-    if (!newSession.title.trim()) return;
-    try {
-      const res = await createSession({ ...newSession, campaign_id: campaignId });
-      setSessions((prev) => [...prev, res.data]);
-      setNewSession({ title: '', session_number: sessions.length + 2, played_on: '', notes: '', campaign_id: campaignId });
-      // setShowModal(false);
-    } catch {
-      console.error('Could not create session');
-    }
-  };
 
   const handleCreateAndNavigate = async () => {
     try {
