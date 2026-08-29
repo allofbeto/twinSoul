@@ -159,7 +159,9 @@
       radial-gradient(120% 90% at 50% 0%, var(--panel-2), var(--panel));
     border: 1px solid var(--border); border-radius: var(--radius);
     padding: 20px; overflow-y: auto; position: relative;
+    transition: box-shadow 0.15s, border-color 0.15s;
   }
+  .theatre__stage.is-dragover { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
   .theatre__scene { display: flex; flex-direction: column; gap: 14px; animation: curtain 0.42s cubic-bezier(0.2, 0.8, 0.2, 1); }
   .theatre__scene-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .theatre__scene-title { font-family: var(--font-display); font-size: 1.4rem; margin: 0; color: var(--ink); }
@@ -191,12 +193,15 @@
   .theatre__empty-hint { color: var(--ink-dim); font-size: 0.85rem; margin: 0; }
   
   /* Tray */
-  .theatre__tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .theatre__tabs {
+    display: flex; border-bottom: 1px solid var(--border);
+    overflow-x: auto; scrollbar-width: thin;
+  }
   .theatre__tab {
-    flex: 1; appearance: none; cursor: pointer; background: transparent;
-    border: none; border-bottom: 2px solid transparent;
+    flex: 1 0 auto; appearance: none; cursor: pointer; background: transparent;
+    border: none; border-bottom: 2px solid transparent; white-space: nowrap;
     color: var(--ink-dim); font: inherit; font-size: 0.72rem; letter-spacing: 0.02em;
-    padding: 10px 4px; display: flex; align-items: center; justify-content: center; gap: 5px;
+    padding: 10px 8px; display: flex; align-items: center; justify-content: center; gap: 5px;
     transition: color 0.15s, border-color 0.15s;
   }
   .theatre__tab:hover { color: var(--ink); }
@@ -206,30 +211,102 @@
     border-radius: 999px; padding: 0 5px; min-width: 16px; text-align: center;
   }
   
-  .theatre__tray-grid { padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-  .theatre__tray-empty { color: var(--ink-dim); font-size: 0.82rem; padding: 12px; text-align: center; }
-  .theatre__card {
-    appearance: none; cursor: pointer; text-align: left; position: relative;
-    display: flex; gap: 10px; align-items: center;
+  .theatre__tray-grid {
+    padding: 10px; overflow-y: auto;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px;
+    align-content: start;
+  }
+  .theatre__tray-empty { grid-column: 1 / -1; color: var(--ink-dim); font-size: 0.82rem; padding: 12px; text-align: center; }
+
+  .theatre__tray-create { padding: 10px 10px 0; }
+  .theatre__tray-add { width: 100%; text-align: center; }
+  .theatre__item-form {
+    display: flex; flex-direction: column; gap: 8px;
     background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 8px; font: inherit; color: var(--ink);
-    transition: border-color 0.15s, transform 0.1s;
+    padding: 10px;
   }
-  .theatre__card:hover { border-color: var(--accent); transform: translateX(2px); }
+  .theatre__item-notes { resize: vertical; font-family: inherit; }
+  .theatre__item-flags { display: flex; gap: 14px; flex-wrap: wrap; }
+  .theatre__item-flag {
+    display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--ink-dim);
+  }
+  .theatre__item-error { color: var(--enemy); font-size: 0.8rem; margin: 0; }
+  .theatre__item-actions { display: flex; gap: 8px; }
+  .theatre__card {
+    display: flex; flex-direction: column; position: relative;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; color: var(--ink); transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  }
+  .theatre__card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25); }
   .theatre__card.is-live { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-  .theatre__card-thumb {
-    width: 46px; height: 46px; flex-shrink: 0; border-radius: 6px;
+  .theatre__card[draggable="true"] { cursor: grab; }
+  .theatre__card[draggable="true"]:active { cursor: grabbing; }
+
+  .theatre__card-media {
+    height: 72px; flex-shrink: 0; position: relative;
     background-size: cover; background-position: center; background-color: var(--panel);
-    display: grid; place-items: center; color: var(--accent); font-family: var(--font-display); font-size: 1.1rem;
+    display: grid; place-items: center; border-bottom: 1px solid var(--border);
   }
-  .theatre__card-meta { display: flex; flex-direction: column; min-width: 0; }
-  .theatre__card-title { font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .theatre__card-sub { font-size: 0.7rem; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .theatre__card-media-letter { color: var(--accent); font-family: var(--font-display); font-size: 1.4rem; }
+
+  .theatre__card-body { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; flex: 1; }
+  .theatre__card-title {
+    margin: 0; font-size: 0.82rem; font-family: var(--font-display);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .theatre__card-sub {
+    margin: 0; font-size: 0.7rem; color: var(--ink-dim);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .theatre__card-preview {
+    margin: 0; font-size: 0.74rem; color: var(--ink-dim); line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .theatre__card-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+
+  .theatre__card-footer {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 10px; border-top: 1px solid var(--border);
+  }
+  .theatre__btn--sm { padding: 5px 10px; font-size: 0.74rem; }
+  .theatre__card-link {
+    appearance: none; cursor: pointer; background: transparent; border: none;
+    color: var(--accent); font: inherit; font-size: 0.74rem; padding: 0; text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .theatre__card-link:hover { filter: brightness(1.15); }
+
   .theatre__live-badge {
     position: absolute; top: 6px; right: 6px; font-size: 0.6rem; letter-spacing: 0.06em;
     text-transform: uppercase; color: var(--bg); background: var(--accent); padding: 1px 6px; border-radius: 999px;
   }
-  
+
+  .theatre__modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(2px);
+    display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 40;
+  }
+  .theatre__modal {
+    position: relative; width: min(520px, 100%); max-height: min(80vh, 720px); overflow-y: auto;
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 24px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); animation: rise 0.18s ease;
+  }
+  .theatre__modal-close {
+    position: absolute; top: 12px; right: 12px; appearance: none; cursor: pointer;
+    background: transparent; border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--ink-dim); width: 28px; height: 28px; line-height: 1; font-size: 1rem;
+  }
+  .theatre__modal-close:hover { color: var(--ink); border-color: var(--accent); }
+  .theatre__modal-media { margin: 0 0 14px; border-radius: var(--radius); overflow: hidden; }
+  .theatre__modal-media img { width: 100%; max-height: 320px; object-fit: cover; display: block; }
+  .theatre__modal-title { margin: 0 0 4px; font-family: var(--font-display); font-size: 1.3rem; padding-right: 30px; }
+  .theatre__modal-sub { margin: 0 0 12px; color: var(--ink-dim); font-size: 0.85rem; }
+  .theatre__modal-body {
+    font-family: var(--font-data); white-space: pre-wrap; margin: 0 0 14px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 14px; font-size: 0.85rem; line-height: 1.55; color: var(--ink);
+  }
+  .theatre__modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+
   /* ---- DM panel --------------------------------------------------- */
   .theatre__panel {
     margin: 0 var(--gap); padding: 12px 14px;

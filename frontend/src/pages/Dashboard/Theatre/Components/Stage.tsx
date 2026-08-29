@@ -1,14 +1,46 @@
+import { useState } from 'react';
+import type { DragEvent } from 'react';
 import type { RevealAsset } from './types';
 
 interface StageProps {
   stage: RevealAsset | null;
   onClear: () => void;
+  onDropAsset?: (asset: RevealAsset) => void;
   readOnly?: boolean;
 }
 
-export default function Stage({ stage, onClear, readOnly = false }: StageProps) {
+export default function Stage({ stage, onClear, onDropAsset, readOnly = false }: StageProps) {
+  const [dragOver, setDragOver] = useState(false);
+  const canDrop = !readOnly && !!onDropAsset;
+
+  const handleDragOver = (e: DragEvent<HTMLElement>) => {
+    if (!canDrop) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setDragOver(true);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLElement>) => {
+    if (!canDrop) return;
+    e.preventDefault();
+    setDragOver(false);
+    const raw = e.dataTransfer.getData('application/json');
+    if (!raw) return;
+    try {
+      onDropAsset!(JSON.parse(raw) as RevealAsset);
+    } catch {
+      // Ignore drops that aren't a tray card.
+    }
+  };
+
   return (
-    <main className="theatre__stage" aria-label="Stage">
+    <main
+      className={`theatre__stage ${dragOver ? 'is-dragover' : ''}`}
+      aria-label="Stage"
+      onDragOver={handleDragOver}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+    >
       {stage ? (
         <div className="theatre__scene" key={stage.id}>
           <div className="theatre__scene-head">

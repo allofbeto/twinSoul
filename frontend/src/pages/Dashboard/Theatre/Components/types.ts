@@ -13,7 +13,7 @@ export const PANE_DEFAULT = 300;
 
 export const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-export type AssetKind = 'art' | 'map' | 'npc' | 'encounter';
+export type AssetKind = 'art' | 'map' | 'npc' | 'encounter' | 'item';
 
 export interface Campaign {
   id: string;
@@ -33,6 +33,14 @@ export interface RevealAsset {
   /** Stat block, read-aloud text, tactics — anything text-heavy. */
   body?: string;
   tags?: string[];
+}
+
+export interface NewItemInput {
+  name: string;
+  categories?: string[];
+  notes?: string;
+  attunement?: boolean;
+  consumable?: boolean;
 }
 
 export interface Combatant {
@@ -78,7 +86,7 @@ export interface RollResult {
 export type DmPanel = null | 'dice' | 'initiative' | 'scratch';
 
 export const KIND_LABEL: Record<AssetKind, string> = {
-  art: 'Art', map: 'Maps', npc: 'NPCs', encounter: 'Encounters',
+  art: 'Art', map: 'Maps', npc: 'NPCs', encounter: 'Encounters', item: 'Items',
 };
 
-export const KIND_ORDER: AssetKind[] = ['art', 'map', 'npc', 'encounter'];
+export const KIND_ORDER: AssetKind[] = ['art', 'map', 'npc', 'encounter', 'item'];

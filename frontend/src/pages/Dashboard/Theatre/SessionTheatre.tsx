@@ -7,7 +7,9 @@ import type {
 } from 'react';
 import DOMPurify from 'dompurify';
 import { useAuth } from '../../../context/AuthContext';
-import { getCampaigns, createCampaign, getSessions, createSession } from '../../../api/backendHelpers'; // ← adjust path
+import {
+  getCampaigns, createCampaign, getSessions, createSession, getCampaignItems, createCampaignItem,
+} from '../../../api/backendHelpers'; // ← adjust path
 import '../../../styles/SessionTheatre.css';
 import '../../../styles/theatreGate.css';
 
@@ -16,6 +18,7 @@ import type {
   Campaign,
   Combatant,
   DmPanel,
+  NewItemInput,
   RevealAsset,
   RollResult,
   Session,
@@ -23,6 +26,7 @@ import type {
 } from './Components/types';
 import { PANE_DEFAULT, PANE_MAX, PANE_MIN, clamp, coerceTheme } from './Components/types';
 import { rollExpression } from './Components/dice';
+import { useTable } from './Components/useTable';
 import CampaignGate from './Components/CampaignGate';
 import SessionPicker from './Components/SessionPicker';
 import Curtain from './Components/Curtain';
@@ -58,6 +62,22 @@ function normalizeSession(raw: any): Session {
   };
 }
 
+// Maps raw item JSON (campaign-scoped loot/gear) → a draggable RevealAsset.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeItem(raw: any): RevealAsset {
+  const categories: string[] | undefined = Array.isArray(raw.categories) && raw.categories.length
+    ? raw.categories
+    : undefined;
+  return {
+    id: String(raw.id),
+    kind: 'item',
+    title: raw.name ?? 'Unnamed item',
+    subtitle: categories?.join(', '),
+    body: raw.notes ?? undefined,
+    tags: categories,
+  };
+}
+
 export default function SessionTheatre({
   sessionTitle = 'Untitled session',
   campaignName,
@@ -68,7 +88,7 @@ export default function SessionTheatre({
   activeCampaign = null,
   onCampaignSelected,
 }: SessionTheatreProps) {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const activeTheme = coerceTheme(theme ?? user?.theme);
 
   // Which campaign we're running. Null → show the campaign gate.
@@ -82,6 +102,18 @@ export default function SessionTheatre({
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [activeSession, setActiveSession] = useState<Session | null>(null);
+
+  // Items the DM has placed in this campaign — draggable onto the stage.
+  const [campaignItems, setCampaignItems] = useState<RevealAsset[]>([]);
+
+  useEffect(() => {
+    if (!selected || selected.role === 'player') return;
+    let alive = true;
+    getCampaignItems(selected.id)
+      .then((res) => { if (alive) setCampaignItems(res.data.map(normalizeItem)); })
+      .catch(() => { if (alive) setCampaignItems([]); });
+    return () => { alive = false; };
+  }, [selected]);
 
   useEffect(() => {
     if (activeCampaign) return;
@@ -118,6 +150,14 @@ export default function SessionTheatre({
     const res = await createSession({ title, campaign_id: selected.id });
     const created = normalizeSession(res.data);
     setSessions((prev) => [created, ...prev]);
+    return created;
+  }, [selected]);
+
+  const handleCreateItem = useCallback(async (data: NewItemInput): Promise<RevealAsset> => {
+    if (!selected) throw new Error('No campaign selected.');
+    const res = await createCampaignItem(selected.id, data);
+    const created = normalizeItem(res.data);
+    setCampaignItems((prev) => [...prev, created]);
     return created;
   }, [selected]);
 
@@ -168,7 +208,12 @@ export default function SessionTheatre({
     '--tray-w': `${trayW}px`,
   } as unknown as CSSProperties;
 
-  const [stage, setStage] = useState<RevealAsset | null>(null);
+  // Stage is shared over ActionCable: the DM drives it, players receive it live.
+  const { stage, reveal: broadcastReveal } = useTable({
+    campaignId: selected?.id ?? null,
+    role: selected?.role,
+    token,
+  });
   const [tab, setTab] = useState<AssetKind>('art');
   const [notesOpen, setNotesOpen] = useState(true);
   const [trayOpen, setTrayOpen] = useState(true);
@@ -192,24 +237,26 @@ export default function SessionTheatre({
 
   const dmgRefs = useRef<Record<string, string>>({});
 
-  const reveal = useCallback((asset: RevealAsset) => setStage(asset), []);
-  const clearStage = useCallback(() => setStage(null), []);
+  const reveal = useCallback((asset: RevealAsset) => broadcastReveal(asset), [broadcastReveal]);
+  const clearStage = useCallback(() => broadcastReveal(null), [broadcastReveal]);
 
   const selectCampaign = useCallback((c: Campaign) => {
     setSelected(c);
     onCampaignSelected?.(c);
   }, [onCampaignSelected]);
 
+  const allAssets = useMemo(() => [...assets, ...campaignItems], [assets, campaignItems]);
+
   const trayItems = useMemo(
-    () => assets.filter((a) => a.kind === tab),
-    [assets, tab],
+    () => allAssets.filter((a) => a.kind === tab),
+    [allAssets, tab],
   );
 
   const kindCounts = useMemo(() => {
-    const counts: Record<AssetKind, number> = { art: 0, map: 0, npc: 0, encounter: 0 };
-    assets.forEach((a) => { counts[a.kind] += 1; });
+    const counts: Record<AssetKind, number> = { art: 0, map: 0, npc: 0, encounter: 0, item: 0 };
+    allAssets.forEach((a) => { counts[a.kind] += 1; });
     return counts;
-  }, [assets]);
+  }, [allAssets]);
 
   /* --- dice handlers --- */
   const doRoll = useCallback(() => {
@@ -373,7 +420,7 @@ export default function SessionTheatre({
           />
         )}
 
-        <Stage stage={stage} onClear={clearStage} />
+        <Stage stage={stage} onClear={clearStage} onDropAsset={reveal} />
 
         {trayOpen && (
           <ResizeHandle
@@ -391,6 +438,7 @@ export default function SessionTheatre({
             kindCounts={kindCounts}
             stageId={stage?.id}
             onReveal={reveal}
+            onCreateItem={handleCreateItem}
           />
         )}
       </div>

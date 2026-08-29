@@ -15,6 +15,8 @@ export const updateCampaign = (id: string, data: object) => api.patch(`/campaign
 export const deleteCampaign = (id: string) => api.delete(`/campaigns/${id}`);
 
 export const getCampaignCharacters = (campaignId: string) => api.get(`/campaigns/${campaignId}/characters`);
+export const getCampaignItems = (campaignId: string) => api.get(`/campaigns/${campaignId}/items`);
+export const createCampaignItem = (campaignId: string, data: object) => api.post(`/campaigns/${campaignId}/items`, data);
 
 // Characters
 export const getCharacters = () => api.get('/characters');

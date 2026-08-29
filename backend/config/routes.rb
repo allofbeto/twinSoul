@@ -1,4 +1,6 @@
 Rails.application.routes.draw do
+  mount ActionCable.server => '/cable'
+
   namespace :api do
     namespace :v1 do
       post 'auth/login', to: 'authentication#login'
@@ -6,6 +8,8 @@ Rails.application.routes.draw do
       get 'campaigns/:campaign_id/players/:id/profile', to: 'players#profile'
       get 'campaigns/joined', to: 'campaigns#joined'
       get 'campaigns/:campaign_id/characters', to: 'characters#campaign_characters'
+      get 'campaigns/:campaign_id/items', to: 'items#campaign_items'
+      post 'campaigns/:campaign_id/items', to: 'items#create_campaign_item'
       post 'characters/:id/migrate_inventory', to: 'characters#migrate_inventory'
       get 'users/search', to: 'users#search'
       resources :campaigns do
