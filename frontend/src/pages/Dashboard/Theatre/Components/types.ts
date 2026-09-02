@@ -35,6 +35,15 @@ export interface RevealAsset {
   tags?: string[];
 }
 
+/** A RevealAsset placed on the stage. Multiple copies of the same asset can be
+ * on stage at once, so each placement gets its own instanceId for keying/removal.
+ * x/y are percentages (0-100) of the stage area, top-left anchored. */
+export interface StagedAsset extends RevealAsset {
+  instanceId: string;
+  x: number;
+  y: number;
+}
+
 export interface NewItemInput {
   name: string;
   categories?: string[];

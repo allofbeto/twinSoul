@@ -5,7 +5,6 @@ import type {
   PointerEvent as ReactPointerEvent,
   ReactNode,
 } from 'react';
-import DOMPurify from 'dompurify';
 import { useAuth } from '../../../context/AuthContext';
 import {
   getCampaigns, createCampaign, getSessions, createSession, getCampaignItems, createCampaignItem,
@@ -33,20 +32,14 @@ import Curtain from './Components/Curtain';
 import ResizeHandle from './Components/ResizeHandle';
 import Stage from './Components/Stage';
 import Tray from './Components/Tray';
-import DmBar from './Components/DmBar';
+import TheatreSideNav from './Components/TheatreSideNav';
 import DicePanel from './Components/DicePanel';
 import InitiativePanel from './Components/InitiativePanel';
 import ScratchPanel from './Components/ScratchPanel';
+import { renderNotes } from './Components/sanitizeNotes';
 
 let idSeed = 0;
 const nextId = () => `c${(idSeed += 1)}`;
-
-// Sanitize Tiptap HTML while keeping the bits Tiptap relies on:
-// link target/rel, and mention data-* attributes.
-const NOTES_SANITIZE_CONFIG = {
-  ADD_ATTR: ['target', 'rel', 'data-type', 'data-id', 'data-label', 'data-mention-suggestion-char'],
-};
-const renderNotes = (html: string) => DOMPurify.sanitize(html, NOTES_SANITIZE_CONFIG);
 
 // Maps raw sessions JSON → Session. One place to edit if the serializer changes.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -209,11 +202,12 @@ export default function SessionTheatre({
   } as unknown as CSSProperties;
 
   // Stage is shared over ActionCable: the DM drives it, players receive it live.
-  const { stage, reveal: broadcastReveal } = useTable({
+  const { stage, addToStage, removeFromStage, moveAsset, clearStage } = useTable({
     campaignId: selected?.id ?? null,
     role: selected?.role,
     token,
   });
+  const stagedIds = useMemo(() => new Set(stage.map((s) => s.id)), [stage]);
   const [tab, setTab] = useState<AssetKind>('art');
   const [notesOpen, setNotesOpen] = useState(true);
   const [trayOpen, setTrayOpen] = useState(true);
@@ -236,9 +230,6 @@ export default function SessionTheatre({
   const [scratch, setScratch] = useState('');
 
   const dmgRefs = useRef<Record<string, string>>({});
-
-  const reveal = useCallback((asset: RevealAsset) => broadcastReveal(asset), [broadcastReveal]);
-  const clearStage = useCallback(() => broadcastReveal(null), [broadcastReveal]);
 
   const selectCampaign = useCallback((c: Campaign) => {
     setSelected(c);
@@ -304,6 +295,12 @@ export default function SessionTheatre({
   const resetCombat = useCallback(() => { setCombatants([]); setTurn(0); }, []);
 
   const togglePanel = useCallback((p: DmPanel) => setPanel((cur) => (cur === p ? null : p)), []);
+
+  // Picking a category from the sidenav both selects it and makes sure the tray is visible.
+  const selectTrayTab = useCallback((k: AssetKind) => {
+    setTab(k);
+    setTrayOpen(true);
+  }, []);
 
   // Notes shown come from the active session, unless a `notes` node was passed.
   const effectiveNotes = activeSession?.notes ?? undefined;
@@ -398,14 +395,65 @@ export default function SessionTheatre({
       <Curtain
         sessionTitle={activeSession.title ?? sessionTitle}
         campaignName={selected.name ?? campaignName}
-        notesOpen={notesOpen}
-        trayOpen={trayOpen}
-        onToggleNotes={() => setNotesOpen((v) => !v)}
-        onToggleTray={() => setTrayOpen((v) => !v)}
-        onExit={onExit}
       />
 
       <div className="theatre__body">
+        <div className="theatre__sidenav-anchor">
+          <TheatreSideNav
+            onExit={onExit}
+            notesOpen={notesOpen}
+            onToggleNotes={() => setNotesOpen((v) => !v)}
+            trayOpen={trayOpen}
+            onToggleTray={() => setTrayOpen((v) => !v)}
+            tab={tab}
+            onTabChange={selectTrayTab}
+            kindCounts={kindCounts}
+            panel={panel}
+            combatantCount={combatants.length}
+            onTogglePanel={togglePanel}
+          />
+
+          {panel && (
+            <div className="theatre__panel" role="region" aria-label={`${panel} tools`}>
+              {panel === 'dice' && (
+                <DicePanel
+                  diceInput={diceInput}
+                  diceError={diceError}
+                  rolls={rolls}
+                  onInputChange={(v) => { setDiceInput(v); setDiceError(false); }}
+                  onRoll={doRoll}
+                  onQuickRoll={quickRoll}
+                />
+              )}
+
+              {panel === 'initiative' && (
+                <InitiativePanel
+                  combatants={combatants}
+                  turn={turn}
+                  cName={cName}
+                  cInit={cInit}
+                  cHp={cHp}
+                  cEnemy={cEnemy}
+                  onNameChange={setCName}
+                  onInitChange={setCInit}
+                  onHpChange={setCHp}
+                  onToggleEnemy={() => setCEnemy((v) => !v)}
+                  onAdd={addCombatant}
+                  onRemove={removeCombatant}
+                  onApplyHp={applyHp}
+                  onNextTurn={nextTurn}
+                  onReset={resetCombat}
+                  dmgRefs={dmgRefs}
+                />
+              )}
+
+              {panel === 'scratch' && (
+                <ScratchPanel value={scratch} onChange={setScratch} />
+              )}
+            </div>
+          )}
+        </div>
+
         {notesOpen && (
           <aside className="theatre__notes" aria-label="Session notes">
             {notesBody}
@@ -420,7 +468,13 @@ export default function SessionTheatre({
           />
         )}
 
-        <Stage stage={stage} onClear={clearStage} onDropAsset={reveal} />
+        <Stage
+          stage={stage}
+          onClear={clearStage}
+          onDropAsset={addToStage}
+          onRemoveAsset={removeFromStage}
+          onMoveAsset={moveAsset}
+        />
 
         {trayOpen && (
           <ResizeHandle
@@ -433,57 +487,13 @@ export default function SessionTheatre({
         {trayOpen && (
           <Tray
             tab={tab}
-            onTabChange={setTab}
             items={trayItems}
-            kindCounts={kindCounts}
-            stageId={stage?.id}
-            onReveal={reveal}
+            stagedIds={stagedIds}
+            onReveal={addToStage}
             onCreateItem={handleCreateItem}
           />
         )}
       </div>
-
-      {panel && (
-        <div className="theatre__panel" role="region" aria-label={`${panel} tools`}>
-          {panel === 'dice' && (
-            <DicePanel
-              diceInput={diceInput}
-              diceError={diceError}
-              rolls={rolls}
-              onInputChange={(v) => { setDiceInput(v); setDiceError(false); }}
-              onRoll={doRoll}
-              onQuickRoll={quickRoll}
-            />
-          )}
-
-          {panel === 'initiative' && (
-            <InitiativePanel
-              combatants={combatants}
-              turn={turn}
-              cName={cName}
-              cInit={cInit}
-              cHp={cHp}
-              cEnemy={cEnemy}
-              onNameChange={setCName}
-              onInitChange={setCInit}
-              onHpChange={setCHp}
-              onToggleEnemy={() => setCEnemy((v) => !v)}
-              onAdd={addCombatant}
-              onRemove={removeCombatant}
-              onApplyHp={applyHp}
-              onNextTurn={nextTurn}
-              onReset={resetCombat}
-              dmgRefs={dmgRefs}
-            />
-          )}
-
-          {panel === 'scratch' && (
-            <ScratchPanel value={scratch} onChange={setScratch} />
-          )}
-        </div>
-      )}
-
-      <DmBar panel={panel} combatantCount={combatants.length} onToggle={togglePanel} />
     </div>
   );
 }

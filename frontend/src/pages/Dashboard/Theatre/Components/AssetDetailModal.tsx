@@ -1,11 +1,13 @@
 import { useEffect } from 'react';
 import type { RevealAsset } from './types';
+import { renderNotes } from './sanitizeNotes';
 
 interface AssetDetailModalProps {
   asset: RevealAsset;
-  isLive: boolean;
+  isLive?: boolean;
   onClose: () => void;
-  onReveal: (asset: RevealAsset) => void;
+  /** Omit when the modal is just a read-only "read more" (e.g. from a card already on stage). */
+  onReveal?: (asset: RevealAsset) => void;
 }
 
 export default function AssetDetailModal({ asset, isLive, onClose, onReveal }: AssetDetailModalProps) {
@@ -36,7 +38,12 @@ export default function AssetDetailModal({ asset, isLive, onClose, onReveal }: A
 
         <h2 className="theatre__modal-title">{asset.title}</h2>
         {asset.subtitle && <p className="theatre__modal-sub">{asset.subtitle}</p>}
-        {asset.body && <pre className="theatre__modal-body">{asset.body}</pre>}
+        {asset.body && (
+          <div
+            className="theatre__modal-body theatre__notes-html"
+            dangerouslySetInnerHTML={{ __html: renderNotes(asset.body) }}
+          />
+        )}
 
         {asset.tags && asset.tags.length > 0 && (
           <div className="theatre__tags">
@@ -45,9 +52,11 @@ export default function AssetDetailModal({ asset, isLive, onClose, onReveal }: A
         )}
 
         <div className="theatre__modal-actions">
-          <button type="button" className="theatre__btn" onClick={() => { onReveal(asset); onClose(); }}>
-            {isLive ? 'On stage' : 'Reveal to table'}
-          </button>
+          {onReveal && (
+            <button type="button" className="theatre__btn" onClick={() => { onReveal(asset); onClose(); }}>
+              {isLive ? 'On stage' : 'Reveal to table'}
+            </button>
+          )}
           <button type="button" className="theatre__btn theatre__btn--ghost" onClick={onClose}>
             Close
           </button>

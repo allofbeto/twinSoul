@@ -1,39 +1,26 @@
 import { useState } from 'react';
 import type { AssetKind, NewItemInput, RevealAsset } from './types';
-import { KIND_LABEL, KIND_ORDER } from './types';
+import { KIND_LABEL } from './types';
 import ItemCreateForm from './ItemCreateForm';
 import AssetDetailModal from './AssetDetailModal';
+import { notesPreviewText } from './sanitizeNotes';
 
 interface TrayProps {
   tab: AssetKind;
-  onTabChange: (k: AssetKind) => void;
   items: RevealAsset[];
-  kindCounts: Record<AssetKind, number>;
-  stageId?: string;
+  stagedIds: Set<string>;
   onReveal: (asset: RevealAsset) => void;
   onCreateItem?: (data: NewItemInput) => Promise<RevealAsset>;
 }
 
 const TAGS_SHOWN = 3;
 
-export default function Tray({ tab, onTabChange, items, kindCounts, stageId, onReveal, onCreateItem }: TrayProps) {
+export default function Tray({ tab, items, stagedIds, onReveal, onCreateItem }: TrayProps) {
   const [detailAsset, setDetailAsset] = useState<RevealAsset | null>(null);
   return (
     <aside className="theatre__tray" aria-label="Reveal tray">
-      <div className="theatre__tabs" role="tablist">
-        {KIND_ORDER.map((k) => (
-          <button
-            key={k}
-            type="button"
-            role="tab"
-            aria-selected={tab === k}
-            className={`theatre__tab ${tab === k ? 'is-active' : ''}`}
-            onClick={() => onTabChange(k)}
-          >
-            {KIND_LABEL[k]}
-            <span className="theatre__tab-count">{kindCounts[k]}</span>
-          </button>
-        ))}
+      <div className="theatre__tray-header">
+        <h3 className="theatre__tray-title">{KIND_LABEL[tab]}</h3>
       </div>
 
       {tab === 'item' && onCreateItem && (
@@ -47,7 +34,7 @@ export default function Tray({ tab, onTabChange, items, kindCounts, stageId, onR
           <p className="theatre__tray-empty">Nothing here yet.</p>
         )}
         {items.map((asset) => {
-          const isLive = stageId === asset.id;
+          const isLive = stagedIds.has(asset.id);
           const shownTags = asset.tags?.slice(0, TAGS_SHOWN);
           const hiddenTagCount = (asset.tags?.length ?? 0) - (shownTags?.length ?? 0);
           return (
@@ -73,7 +60,9 @@ export default function Tray({ tab, onTabChange, items, kindCounts, stageId, onR
               <div className="theatre__card-body">
                 <h3 className="theatre__card-title">{asset.title}</h3>
                 {asset.subtitle && <p className="theatre__card-sub">{asset.subtitle}</p>}
-                {asset.body && <p className="theatre__card-preview">{asset.body}</p>}
+                {asset.body && (
+                  <p className="theatre__card-preview">{notesPreviewText(asset.body)}</p>
+                )}
                 {shownTags && shownTags.length > 0 && (
                   <div className="theatre__card-tags">
                     {shownTags.map((tg) => <span key={tg} className="theatre__tag">{tg}</span>)}
@@ -84,7 +73,7 @@ export default function Tray({ tab, onTabChange, items, kindCounts, stageId, onR
 
               <div className="theatre__card-footer">
                 <button type="button" className="theatre__btn theatre__btn--sm" onClick={() => onReveal(asset)}>
-                  {isLive ? 'On stage' : 'Reveal'}
+                  {isLive ? 'Reveal again' : 'Reveal'}
                 </button>
                 <button type="button" className="theatre__card-link" onClick={() => setDetailAsset(asset)}>
                   Read more
@@ -98,7 +87,7 @@ export default function Tray({ tab, onTabChange, items, kindCounts, stageId, onR
       {detailAsset && (
         <AssetDetailModal
           asset={detailAsset}
-          isLive={stageId === detailAsset.id}
+          isLive={stagedIds.has(detailAsset.id)}
           onClose={() => setDetailAsset(null)}
           onReveal={onReveal}
         />
