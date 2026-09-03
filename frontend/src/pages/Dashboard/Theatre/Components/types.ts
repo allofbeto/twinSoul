@@ -46,10 +46,12 @@ export interface StagedAsset extends RevealAsset {
 
 export interface NewItemInput {
   name: string;
+  kind: AssetKind;
   categories?: string[];
   notes?: string;
   attunement?: boolean;
   consumable?: boolean;
+  imageUrl?: string;
 }
 
 export interface Combatant {

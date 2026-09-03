@@ -23,9 +23,9 @@ export default function Tray({ tab, items, stagedIds, onReveal, onCreateItem }: 
         <h3 className="theatre__tray-title">{KIND_LABEL[tab]}</h3>
       </div>
 
-      {tab === 'item' && onCreateItem && (
+      {onCreateItem && (
         <div className="theatre__tray-create">
-          <ItemCreateForm onCreate={onCreateItem} />
+          <ItemCreateForm kind={tab} onCreate={onCreateItem} />
         </div>
       )}
 

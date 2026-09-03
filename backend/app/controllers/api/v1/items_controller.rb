@@ -93,6 +93,9 @@ class Api::V1::ItemsController < ApplicationController
   end
 
   def item_params
-    params.permit(:name, :notes, :attunement, :consumable, :campaign_id, categories: [])
+    params.permit(:name, :notes, :attunement, :consumable, :campaign_id, :kind, :image_url,
+      :armor_class, :max_hp, :current_hp, :challenge_rating, :disposition,
+      :strength, :dexterity, :constitution, :intelligence, :wisdom, :charisma,
+      categories: [])
   end
 end

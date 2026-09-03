@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getSessions, updateSession, deleteSession } from '../../../api/backendHelpers';
+import { getSessions, updateSession, deleteSession, createCampaignItem } from '../../../api/backendHelpers';
 import SessionEditor from '../../../components/formComponents/editor/SessionEditor';
+import type { AssetKind } from '../Theatre/Components/types';
 import { Modal, ModalHeader, ModalBody } from 'reactstrap';
 
 interface Session {
@@ -77,6 +78,13 @@ const SessionDetail = () => {
     setIsDirty(true);
     setSaveStatus('saving');
   };
+
+  const handleCreateObject = useCallback(async (data: { name: string; kind: AssetKind }) => {
+    const campaignId = formRef.current?.campaign_id;
+    if (!campaignId) throw new Error('This session has no campaign — cannot create a campaign object.');
+    const res = await createCampaignItem(campaignId, { name: data.name, kind: data.kind });
+    return { id: String(res.data.id), title: res.data.name ?? data.name };
+  }, []);
 
   const handleDelete = async () => {
     if (!session) return;
@@ -177,6 +185,7 @@ const SessionDetail = () => {
           content={form.notes || ''}
           onChange={(html) => { setForm({ ...form, notes: html }); markDirty(); }}
           campaignId={form.campaign_id || undefined}
+          onCreateObject={handleCreateObject}
         />
       </div>
 

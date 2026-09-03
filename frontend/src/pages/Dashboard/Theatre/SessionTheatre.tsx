@@ -7,7 +7,7 @@ import type {
 } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import {
-  getCampaigns, createCampaign, getSessions, createSession, getCampaignItems, createCampaignItem,
+  getCampaigns, createCampaign, getSessions, createSession, getCampaignItems, createCampaignItem, updateSession,
 } from '../../../api/backendHelpers'; // ← adjust path
 import '../../../styles/SessionTheatre.css';
 import '../../../styles/theatreGate.css';
@@ -36,7 +36,7 @@ import TheatreSideNav from './Components/TheatreSideNav';
 import DicePanel from './Components/DicePanel';
 import InitiativePanel from './Components/InitiativePanel';
 import ScratchPanel from './Components/ScratchPanel';
-import { renderNotes } from './Components/sanitizeNotes';
+import TheatreNotesEditor from './Components/TheatreNotesEditor';
 
 let idSeed = 0;
 const nextId = () => `c${(idSeed += 1)}`;
@@ -63,8 +63,9 @@ function normalizeItem(raw: any): RevealAsset {
     : undefined;
   return {
     id: String(raw.id),
-    kind: 'item',
+    kind: (raw.kind as AssetKind) ?? 'item',
     title: raw.name ?? 'Unnamed item',
+    imageUrl: raw.image_url ?? undefined,
     subtitle: categories?.join(', '),
     body: raw.notes ?? undefined,
     tags: categories,
@@ -148,7 +149,8 @@ export default function SessionTheatre({
 
   const handleCreateItem = useCallback(async (data: NewItemInput): Promise<RevealAsset> => {
     if (!selected) throw new Error('No campaign selected.');
-    const res = await createCampaignItem(selected.id, data);
+    const { imageUrl, ...rest } = data;
+    const res = await createCampaignItem(selected.id, { ...rest, image_url: imageUrl });
     const created = normalizeItem(res.data);
     setCampaignItems((prev) => [...prev, created]);
     return created;
@@ -305,6 +307,40 @@ export default function SessionTheatre({
   // Notes shown come from the active session, unless a `notes` node was passed.
   const effectiveNotes = activeSession?.notes ?? undefined;
 
+  // Live notes editing: debounced autosave to the session, keyed off a ref so the
+  // timer always saves the latest content even if it fires after a later keystroke.
+  const [notesSaveStatus, setNotesSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const activeSessionRef = useRef(activeSession);
+  activeSessionRef.current = activeSession;
+  const notesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const saveNotes = useCallback(async () => {
+    const current = activeSessionRef.current;
+    if (!current) return;
+    try {
+      await updateSession(current.id, { notes: current.notes ?? '' });
+      setNotesSaveStatus('saved');
+    } catch {
+      setNotesSaveStatus('idle');
+    }
+  }, []);
+
+  const handleNotesChange = useCallback((html: string) => {
+    setActiveSession((prev) => (prev ? { ...prev, notes: html } : prev));
+    setNotesSaveStatus('saving');
+    if (notesSaveTimer.current) clearTimeout(notesSaveTimer.current);
+    notesSaveTimer.current = setTimeout(saveNotes, 600);
+  }, [saveNotes]);
+
+  useEffect(() => () => {
+    if (notesSaveTimer.current) clearTimeout(notesSaveTimer.current);
+  }, []);
+
+  // Clear any stale "Saved" indicator when switching to a different session.
+  useEffect(() => {
+    setNotesSaveStatus('idle');
+  }, [activeSession?.id]);
+
   // --- gates (all after the hooks above, so hook order stays stable) ---
 
   // 1) Choose / create a campaign.
@@ -371,24 +407,18 @@ export default function SessionTheatre({
   }
 
   // 4) Full owner theatre.
-  let notesBody: ReactNode;
-  if (notes) {
-    notesBody = notes;
-  } else if (effectiveNotes) {
-    notesBody = (
-      <div
-        className="theatre__notes-html"
-        dangerouslySetInnerHTML={{ __html: renderNotes(effectiveNotes) }}
-      />
-    );
-  } else {
-    notesBody = (
-      <div className="theatre__notes-empty">
-        <p className="theatre__notes-empty-title">No notes yet</p>
-        <p className="theatre__notes-empty-hint">This session doesn’t have notes yet.</p>
-      </div>
-    );
-  }
+  const notesSaveLabel =
+    notesSaveStatus === 'saving' ? 'Saving…' : notesSaveStatus === 'saved' ? 'Saved' : undefined;
+
+  const notesBody: ReactNode = notes ?? (
+    <TheatreNotesEditor
+      key={activeSession.id}
+      content={effectiveNotes ?? ''}
+      onChange={handleNotesChange}
+      saveLabel={notesSaveLabel}
+      onCreateObject={handleCreateItem}
+    />
+  );
 
   return (
     <div className={`theatre theatre--${activeTheme}`} style={rootStyle} role="application" aria-label="Session theatre">

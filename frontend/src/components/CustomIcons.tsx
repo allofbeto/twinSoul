@@ -41,6 +41,43 @@ const icons = {
       </svg>
     ),
   
+    npcs: (color = "currentColor") => (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle
+          cx="16"
+          cy="7"
+          r="2.6"
+          stroke={color}
+          strokeWidth="1.6"
+        />
+        <path
+          d="M13.6 20c.35-3 1.9-5 3.6-5.3"
+          stroke={color}
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle
+          cx="9"
+          cy="8.5"
+          r="3.2"
+          stroke={color}
+          strokeWidth="1.8"
+        />
+        <path
+          d="M3.5 20c.5-3.8 2.8-6 5.5-6s5 2.2 5.5 6"
+          stroke={color}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+
     campaigns: (color = "currentColor") => (
       <svg
         viewBox="0 0 24 24"

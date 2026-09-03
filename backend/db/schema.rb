@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_06_29_142045) do
+ActiveRecord::Schema[7.0].define(version: 2026_09_03_141132) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -83,6 +83,19 @@ ActiveRecord::Schema[7.0].define(version: 2026_06_29_142045) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.uuid "campaign_id"
+    t.string "kind", default: "item", null: false
+    t.string "image_url"
+    t.integer "armor_class", default: 10
+    t.integer "max_hp", default: 10
+    t.integer "current_hp", default: 10
+    t.string "challenge_rating"
+    t.string "disposition", default: "neutral"
+    t.integer "strength", default: 10
+    t.integer "dexterity", default: 10
+    t.integer "constitution", default: 10
+    t.integer "intelligence", default: 10
+    t.integer "wisdom", default: 10
+    t.integer "charisma", default: 10
     t.index ["campaign_id"], name: "index_items_on_campaign_id"
     t.index ["inventory_id"], name: "index_items_on_inventory_id"
     t.index ["user_id"], name: "index_items_on_user_id"

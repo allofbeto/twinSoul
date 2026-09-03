@@ -1,24 +1,33 @@
 import { useState } from 'react';
-import type { NewItemInput, RevealAsset } from './types';
+import type { AssetKind, NewItemInput, RevealAsset } from './types';
+
+const KIND_LABEL_SINGULAR: Record<AssetKind, string> = {
+  art: 'Art', map: 'Location', npc: 'NPC', encounter: 'Encounter', item: 'Item',
+};
 
 interface ItemCreateFormProps {
+  kind: AssetKind;
   onCreate: (data: NewItemInput) => Promise<RevealAsset>;
 }
 
-export default function ItemCreateForm({ onCreate }: ItemCreateFormProps) {
+export default function ItemCreateForm({ kind, onCreate }: ItemCreateFormProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [categories, setCategories] = useState('');
   const [notes, setNotes] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [attunement, setAttunement] = useState(false);
   const [consumable, setConsumable] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const label = KIND_LABEL_SINGULAR[kind];
+
   const reset = () => {
     setName('');
     setCategories('');
     setNotes('');
+    setImageUrl('');
     setAttunement(false);
     setConsumable(false);
     setError(null);
@@ -35,15 +44,17 @@ export default function ItemCreateForm({ onCreate }: ItemCreateFormProps) {
     try {
       await onCreate({
         name: trimmed,
+        kind,
         categories: categories.split(',').map((c) => c.trim()).filter(Boolean),
         notes: notes.trim() || undefined,
-        attunement,
-        consumable,
+        imageUrl: imageUrl.trim() || undefined,
+        attunement: kind === 'item' ? attunement : undefined,
+        consumable: kind === 'item' ? consumable : undefined,
       });
       reset();
       setOpen(false);
     } catch {
-      setError('Could not create item.');
+      setError(`Could not create ${label.toLowerCase()}.`);
     } finally {
       setSaving(false);
     }
@@ -52,7 +63,7 @@ export default function ItemCreateForm({ onCreate }: ItemCreateFormProps) {
   if (!open) {
     return (
       <button type="button" className="theatre__btn theatre__btn--ghost theatre__tray-add" onClick={() => setOpen(true)}>
-        + New item
+        + New {label}
       </button>
     );
   }
@@ -64,7 +75,7 @@ export default function ItemCreateForm({ onCreate }: ItemCreateFormProps) {
     >
       <input
         className="theatre__input"
-        placeholder="Item name"
+        placeholder={`${label} name`}
         value={name}
         onChange={(e) => setName(e.target.value)}
         autoFocus
@@ -82,16 +93,24 @@ export default function ItemCreateForm({ onCreate }: ItemCreateFormProps) {
         onChange={(e) => setNotes(e.target.value)}
         rows={2}
       />
-      <div className="theatre__item-flags">
-        <label className="theatre__item-flag">
-          <input type="checkbox" checked={attunement} onChange={(e) => setAttunement(e.target.checked)} />
-          Attunement
-        </label>
-        <label className="theatre__item-flag">
-          <input type="checkbox" checked={consumable} onChange={(e) => setConsumable(e.target.checked)} />
-          Consumable
-        </label>
-      </div>
+      <input
+        className="theatre__input"
+        placeholder="Image URL (optional)"
+        value={imageUrl}
+        onChange={(e) => setImageUrl(e.target.value)}
+      />
+      {kind === 'item' && (
+        <div className="theatre__item-flags">
+          <label className="theatre__item-flag">
+            <input type="checkbox" checked={attunement} onChange={(e) => setAttunement(e.target.checked)} />
+            Attunement
+          </label>
+          <label className="theatre__item-flag">
+            <input type="checkbox" checked={consumable} onChange={(e) => setConsumable(e.target.checked)} />
+            Consumable
+          </label>
+        </div>
+      )}
       {error && <p className="theatre__item-error">{error}</p>}
       <div className="theatre__item-actions">
         <button type="submit" className="theatre__btn" disabled={saving}>

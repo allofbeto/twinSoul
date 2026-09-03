@@ -7,6 +7,7 @@ import Mention from '@tiptap/extension-mention';
 import { TextStyle, Color } from '@tiptap/extension-text-style';
 import { getCampaignCharacters, getItems } from '../../../api/backendHelpers';
 import { createSuggestion } from './MentionSuggestion';
+import { CampaignObjectMention, createSlashCommandSuggestion, type CreateCampaignObject } from './CampaignObjectMention';
 import { Pagination } from './Pagination';
 import EditorOutline from './EditorOutline';
 import '../../../styles/SessionEditor.css'
@@ -16,6 +17,7 @@ interface Props {
     onChange: (html: string) => void;
     readOnly?: boolean;
     campaignId?: string;
+    onCreateObject?: CreateCampaignObject;
 }
 
 const FONT_COLORS = [
@@ -98,13 +100,13 @@ const MenuBar = ({ editor }: { editor: any }) => {
       {btn(() => editor.chain().focus().undo().run(), '↩')}
       {btn(() => editor.chain().focus().redo().run(), '↪')}
       <div className="editor-menu-hint">
-        <small>@ character/place · # item/lore</small>
+        <small>@ character/place · # item/lore · / new NPC/item/location…</small>
       </div>
     </div>
   );
 };
 
-const SessionEditor = ({ content, onChange, readOnly = false, campaignId }: Props) => {
+const SessionEditor = ({ content, onChange, readOnly = false, campaignId, onCreateObject }: Props) => {
     const characterSuggestion = createSuggestion('@', async (query) => {
         if (!campaignId) return [];
         const res = await getCampaignCharacters(campaignId);
@@ -141,6 +143,12 @@ const SessionEditor = ({ content, onChange, readOnly = false, campaignId }: Prop
         HTMLAttributes: { class: 'mention mention-item' },
         suggestion: itemSuggestion,
       }),
+      ...(onCreateObject
+        ? [CampaignObjectMention.configure({
+            HTMLAttributes: { class: 'mention mention-object' },
+            suggestion: createSlashCommandSuggestion(onCreateObject),
+          })]
+        : []),
       // Pagination only makes sense on the page canvas (edit mode)
       ...(!readOnly
         ? [Pagination.configure({ pageHeight: 1100, gap: 48 })]

@@ -29,6 +29,11 @@ const navItems: NavItem[] = [
     icon: "characters",
   },
   {
+    label: "NPCs",
+    path: "/dashboard/npcs",
+    icon: "npcs",
+  },
+  {
     label: "Campaigns",
     path: "/dashboard/campaigns",
     icon: "campaigns",

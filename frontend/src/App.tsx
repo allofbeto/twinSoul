@@ -11,6 +11,9 @@ import Characters from './pages/Dashboard/Characters/Characters';
 import CharacterDetail from './pages/Dashboard/Characters/CharacterDetail';
 import Items from './pages/Dashboard/Items/Items';
 import NewCharacter from './pages/Dashboard/Characters/NewCharacter';
+import Npcs from './pages/Dashboard/Npcs/Npcs';
+import NewNpc from './pages/Dashboard/Npcs/NewNpc';
+import NpcDetail from './pages/Dashboard/Npcs/NpcDetail';
 import Home from './pages/Dashboard/Home/Home';
 import MyAccount from './pages/Dashboard/MyAccount/MyAccount';
 import PlayerProfile from './pages/Players/PlayerProfile';
@@ -43,6 +46,9 @@ const App = () => {
             <Route path="characters" element={<Characters />} />
             <Route path="characters/new" element={<NewCharacter />} />
             <Route path="characters/:id" element={<CharacterDetail />} />
+            <Route path="npcs" element={<Npcs />} />
+            <Route path="npcs/new" element={<NewNpc />} />
+            <Route path="npcs/:id" element={<NpcDetail />} />
             <Route path="campaigns" element={<Campaigns />} />
             <Route path="campaigns/new" element={<NewCampaign />} />
             <Route path="campaigns/:id" element={<CampaignDetail />} />
