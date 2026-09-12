@@ -5,6 +5,7 @@ class Campaign < ApplicationRecord
     has_many :characters, dependent: :nullify
     has_many :items, dependent: :nullify
     has_many :players, class_name: 'Player', dependent: :destroy
+    has_many :encounters, dependent: :nullify
   
     validates :name, presence: true
     validates :status, inclusion: { in: %w[active inactive archived] }

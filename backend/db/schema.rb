@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_09_03_160000) do
+ActiveRecord::Schema[7.0].define(version: 2026_09_12_204509) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -53,6 +53,45 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_03_160000) do
     t.index ["campaign_id"], name: "index_characters_on_campaign_id"
     t.index ["profile_image_id"], name: "index_characters_on_profile_image_id"
     t.index ["user_id"], name: "index_characters_on_user_id"
+  end
+
+  create_table "encounter_monsters", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "monster_id"
+    t.uuid "item_id"
+    t.string "name", null: false
+    t.string "challenge_rating"
+    t.integer "xp", default: 0
+    t.integer "quantity", default: 1, null: false
+    t.text "notes"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "encounter_phase_id", null: false
+    t.index ["encounter_phase_id"], name: "index_encounter_monsters_on_encounter_phase_id"
+    t.index ["item_id"], name: "index_encounter_monsters_on_item_id"
+    t.index ["monster_id"], name: "index_encounter_monsters_on_monster_id"
+  end
+
+  create_table "encounter_phases", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "encounter_id", null: false
+    t.string "name", default: "Phase 1", null: false
+    t.integer "position", default: 0, null: false
+    t.text "notes"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["encounter_id"], name: "index_encounter_phases_on_encounter_id"
+  end
+
+  create_table "encounters", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "user_id", null: false
+    t.uuid "campaign_id"
+    t.string "name", null: false
+    t.text "notes"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "session_id"
+    t.index ["campaign_id"], name: "index_encounters_on_campaign_id"
+    t.index ["session_id"], name: "index_encounters_on_session_id"
+    t.index ["user_id"], name: "index_encounters_on_user_id"
   end
 
   create_table "image_assets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -142,8 +181,10 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_03_160000) do
     t.string "source", default: "SRD 5.1"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "habitats", default: [], array: true
     t.index ["cr_numeric"], name: "index_monsters_on_cr_numeric"
     t.index ["creature_type"], name: "index_monsters_on_creature_type"
+    t.index ["habitats"], name: "index_monsters_on_habitats", using: :gin
     t.index ["index"], name: "index_monsters_on_index", unique: true
     t.index ["name"], name: "index_monsters_on_name"
   end
@@ -193,6 +234,13 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_03_160000) do
   add_foreign_key "characters", "campaigns"
   add_foreign_key "characters", "image_assets", column: "profile_image_id"
   add_foreign_key "characters", "users"
+  add_foreign_key "encounter_monsters", "encounter_phases"
+  add_foreign_key "encounter_monsters", "items"
+  add_foreign_key "encounter_monsters", "monsters"
+  add_foreign_key "encounter_phases", "encounters"
+  add_foreign_key "encounters", "campaigns"
+  add_foreign_key "encounters", "sessions"
+  add_foreign_key "encounters", "users"
   add_foreign_key "image_assets", "users"
   add_foreign_key "inventories", "characters"
   add_foreign_key "inventories", "users"

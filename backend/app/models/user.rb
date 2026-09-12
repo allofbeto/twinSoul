@@ -11,4 +11,5 @@ class User < ApplicationRecord
     has_many :items, dependent: :destroy
     has_many :campaigns, dependent: :destroy
     has_many :sessions, dependent: :destroy
+    has_many :encounters, dependent: :destroy
 end

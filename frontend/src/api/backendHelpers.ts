@@ -45,6 +45,19 @@ export const migrateInventory = (characterId: string, actionType: string) => api
 export const getMonsters = () => api.get('/monsters');
 export const getMonster = (id: string) => api.get(`/monsters/${id}`);
 
+// Encounters
+export const getEncounters = (params?: { campaignId?: string; sessionId?: string }) => {
+  const query = new URLSearchParams();
+  if (params?.campaignId) query.set('campaign_id', params.campaignId);
+  if (params?.sessionId) query.set('session_id', params.sessionId);
+  const qs = query.toString();
+  return api.get(`/encounters${qs ? `?${qs}` : ''}`);
+};
+export const getEncounter = (id: string) => api.get(`/encounters/${id}`);
+export const createEncounter = (data: object) => api.post('/encounters', data);
+export const updateEncounter = (id: string, data: object) => api.patch(`/encounters/${id}`, data);
+export const deleteEncounter = (id: string) => api.delete(`/encounters/${id}`);
+
 // Players
 export const getPlayers = (campaignId: string) => api.get(`/campaigns/${campaignId}/players`);
 export const addPlayer = (campaignId: string, data: object) => api.post(`/campaigns/${campaignId}/players`, data);

@@ -168,6 +168,36 @@ const icons = {
       </svg>
     ),
 
+    encounters: (color = "currentColor") => (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M4 4l7 7M4 4l1.5 4.5L4 10l4.5-1.5L11 11"
+          stroke={color}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M20 4l-7 7M20 4l-1.5 4.5L20 10l-4.5-1.5L13 11"
+          stroke={color}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M12 12.5L5 19.5M12 12.5l7 7"
+          stroke={color}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+
     sessions: (color = "currentColor") => (
       <svg
         viewBox="0 0 24 24"

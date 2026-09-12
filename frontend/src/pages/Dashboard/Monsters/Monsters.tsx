@@ -1,8 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { getItems, getMonsters, deleteItem, getJoinedCampaigns, getCampaignItems } from '../../../api/backendHelpers';
 import { useNavigate } from 'react-router-dom';
 import DataTable, { Column } from '../../../components/DataTable';
 import { VISIBILITY_SECTIONS } from './Components/VisibilityPanel';
+import BestiaryFilterBar from './Components/BestiaryFilterBar';
+import { useBestiaryFilters } from './useBestiaryFilters';
+import MonsterDetailSlideOver from './Components/MonsterDetailSlideOver';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import '../../../styles/npc.css';
 
@@ -15,6 +18,7 @@ interface BestiaryMonster {
   cr_numeric: number;
   armor_class: number;
   hit_points: number;
+  habitats: string[];
 }
 
 interface HomebrewMonster {
@@ -49,11 +53,11 @@ const Monsters = () => {
   const [bestiary, setBestiary] = useState<BestiaryMonster[]>([]);
   const [homebrew, setHomebrew] = useState<HomebrewMonster[]>([]);
   const [campaignMonsters, setCampaignMonsters] = useState<CampaignMonster[]>([]);
-  const [typeFilter, setTypeFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<HomebrewMonster | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [selectedMonsterId, setSelectedMonsterId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -90,15 +94,8 @@ const Monsters = () => {
     fetch();
   }, []);
 
-  const creatureTypes = useMemo(
-    () => Array.from(new Set(bestiary.map((m) => m.creature_type))).filter(Boolean).sort(),
-    [bestiary]
-  );
-
-  const filteredBestiary = useMemo(
-    () => (typeFilter ? bestiary.filter((m) => m.creature_type === typeFilter) : bestiary),
-    [bestiary, typeFilter]
-  );
+  const { filters, setFilters, filtered: filteredBestiary, creatureTypes, sizes, habitats, clear } =
+    useBestiaryFilters(bestiary);
 
   const confirmDeleteHomebrew = async () => {
     if (!deleteTarget) return;
@@ -118,28 +115,35 @@ const Monsters = () => {
     {
       key: 'name',
       label: 'NAME',
-      width: '40%',
+      width: '28%',
       sortable: true,
       render: (m) => (
-        <span
-          style={{ color: 'var(--color-primary)', cursor: 'pointer' }}
-          onClick={() => navigate(`/dashboard/monsters/bestiary/${m.id}`)}
-        >
-          {m.name}
-        </span>
+        <span style={{ color: 'var(--color-primary)' }}>{m.name}</span>
       ),
     },
     {
       key: 'creature_type',
       label: 'TYPE',
-      width: '25%',
+      width: '17%',
       sortable: true,
       render: (m) => <span className="text-muted-theme" style={{ textTransform: 'capitalize' }}>{m.creature_type}</span>,
     },
     {
+      key: 'habitats',
+      label: 'HABITAT',
+      width: '25%',
+      render: (m) => (
+        <div className="d-flex flex-wrap gap-1">
+          {(m.habitats || []).map((h) => (
+            <span key={h} className="badge-cls" style={{ fontSize: '0.65rem', textTransform: 'capitalize' }}>{h}</span>
+          ))}
+        </div>
+      ),
+    },
+    {
       key: 'cr_numeric',
       label: 'CR',
-      width: '15%',
+      width: '10%',
       align: 'center',
       sortable: true,
       render: (m) => <span className="badge-cls">{m.challenge_rating}</span>,
@@ -149,12 +153,14 @@ const Monsters = () => {
       label: 'AC',
       width: '10%',
       align: 'center',
+      sortable: true,
     },
     {
       key: 'hit_points',
       label: 'HP',
       width: '10%',
       align: 'center',
+      sortable: true,
     },
   ];
 
@@ -180,26 +186,22 @@ const Monsters = () => {
       <div className="card-theme p-4 mb-4">
         <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
           <h5 className="text-theme mb-0">Bestiary <span className="text-muted-theme">({filteredBestiary.length})</span></h5>
-          <select
-            className="form-select input-theme"
-            style={{ width: 'auto' }}
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-          >
-            <option value="">All Types</option>
-            {creatureTypes.map((t) => (
-              <option key={t} value={t} style={{ textTransform: 'capitalize' }}>{t}</option>
-            ))}
-          </select>
         </div>
+        <BestiaryFilterBar
+          filters={filters}
+          onChange={setFilters}
+          creatureTypes={creatureTypes}
+          sizes={sizes}
+          habitats={habitats}
+          onClear={clear}
+        />
         <DataTable
           columns={columns}
           data={filteredBestiary}
           keyField="id"
           pageSize={15}
-          searchable
-          searchPlaceholder="Search the bestiary..."
           emptyMessage="No monsters match."
+          onRowClick={(m) => setSelectedMonsterId(m.id)}
         />
       </div>
 
@@ -301,6 +303,11 @@ const Monsters = () => {
         confirming={deleting}
         onConfirm={confirmDeleteHomebrew}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <MonsterDetailSlideOver
+        monsterId={selectedMonsterId}
+        onClose={() => setSelectedMonsterId(null)}
       />
     </div>
   );

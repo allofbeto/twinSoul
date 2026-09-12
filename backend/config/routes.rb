@@ -25,6 +25,7 @@ Rails.application.routes.draw do
       resources :monsters, only: [:index, :show]
       resources :items
       resources :sessions, only: [:index, :create, :update, :destroy]
+      resources :encounters
       resource :user, only: [:show, :update, :destroy] do
         patch :deactivate
         patch :close

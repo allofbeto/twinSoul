@@ -19,6 +19,7 @@ interface Props<T> {
   emptyMessage?: string;
   toolbar?: React.ReactNode;
   expandable?: (row: T) => React.ReactNode;
+  onRowClick?: (row: T) => void;
 }
 
 function DataTable<T>({
@@ -31,6 +32,7 @@ function DataTable<T>({
   emptyMessage = 'No results found.',
   toolbar,
   expandable,
+  onRowClick,
 }: Props<T>) {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<string | null>(null);
@@ -138,7 +140,11 @@ function DataTable<T>({
             const isExpanded = expanded === key;
             return (
               <React.Fragment key={key}>
-                <tr className="skill-row">
+                <tr
+                  className="skill-row"
+                  style={onRowClick ? { cursor: 'pointer' } : undefined}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                >
                   {columns.map((col) => (
                     <td
                       key={col.key}
@@ -158,7 +164,7 @@ function DataTable<T>({
                       <button
                         type="button"
                         className="btn btn-sm btn-outline-secondary"
-                        onClick={() => setExpanded(isExpanded ? null : key)}
+                        onClick={(e) => { e.stopPropagation(); setExpanded(isExpanded ? null : key); }}
                       >
                         {isExpanded ? '▴' : '▾'}
                       </button>
