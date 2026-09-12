@@ -58,9 +58,15 @@ function DataTable<T>({
     })
     .sort((a, b) => {
       if (!sortBy) return 0;
-      const aVal = String((a as any)[sortBy] || '');
-      const bVal = String((b as any)[sortBy] || '');
-      return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      const aRaw = (a as any)[sortBy];
+      const bRaw = (b as any)[sortBy];
+      let result: number;
+      if (typeof aRaw === 'number' && typeof bRaw === 'number') {
+        result = aRaw - bRaw;
+      } else {
+        result = String(aRaw || '').localeCompare(String(bRaw || ''));
+      }
+      return sortDir === 'asc' ? result : -result;
     });
 
   const totalPages = Math.ceil(filtered.length / pageSize);

@@ -44,6 +44,11 @@ const navItems: NavItem[] = [
     icon: "items",
   },
   {
+    label: "Monsters",
+    path: "/dashboard/monsters",
+    icon: "monster",
+  },
+  {
     label: "Sessions",
     path: "/dashboard/sessions",
     icon: "sessions",

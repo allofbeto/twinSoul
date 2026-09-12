@@ -50,19 +50,34 @@ class Api::V1::ItemsController < ApplicationController
   end
 
   def destroy
-    character = @current_user.characters.find(params[:character_id])
-    inventory = character.inventory
-    item = inventory.items.find(params[:id])
+    if params[:character_id]
+      character = @current_user.characters.find(params[:character_id])
+      inventory = character.inventory
+      item = inventory.items.find(params[:id])
+    else
+      item = @current_user.items.find(params[:id])
+    end
+
     item.destroy
     render json: { message: 'Item deleted' }, status: :ok
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Item not found' }, status: :not_found
   end
 
   # Items the DM has put in play for this campaign (theatre tray).
+  # DMs see everything; other members get monsters redacted down to
+  # whatever sections the DM has marked player-visible (none, by default).
   def campaign_items
     campaign = Campaign.find(params[:campaign_id])
     return render json: { error: 'Forbidden' }, status: :forbidden unless member?(campaign)
 
-    render json: Item.where(campaign_id: campaign.id), status: :ok
+    items = Item.where(campaign_id: campaign.id)
+    if owner?(campaign)
+      render json: items, status: :ok
+    else
+      visible = items.select { |item| item.kind != 'monster' || item.any_section_visible? }
+      render json: visible.map { |item| item.kind == 'monster' ? item.player_view : item }, status: :ok
+    end
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Campaign not found' }, status: :not_found
   end
@@ -96,6 +111,7 @@ class Api::V1::ItemsController < ApplicationController
     params.permit(:name, :notes, :attunement, :consumable, :campaign_id, :kind, :image_url,
       :armor_class, :max_hp, :current_hp, :challenge_rating, :disposition,
       :strength, :dexterity, :constitution, :intelligence, :wisdom, :charisma,
-      categories: [])
+      categories: [], visible_sections: [],
+      traits: [:name, :desc], actions: [:name, :desc], legendary_actions: [:name, :desc])
   end
 end

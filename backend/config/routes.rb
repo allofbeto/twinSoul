@@ -22,6 +22,7 @@ Rails.application.routes.draw do
         end
       end
       resources :image_assets, only: [:index, :create, :destroy]
+      resources :monsters, only: [:index, :show]
       resources :items
       resources :sessions, only: [:index, :create, :update, :destroy]
       resource :user, only: [:show, :update, :destroy] do

@@ -18,6 +18,11 @@ import Home from './pages/Dashboard/Home/Home';
 import MyAccount from './pages/Dashboard/MyAccount/MyAccount';
 import PlayerProfile from './pages/Players/PlayerProfile';
 import ItemDetail from './pages/Dashboard/Items/ItemDetail';
+import Monsters from './pages/Dashboard/Monsters/Monsters';
+import NewMonster from './pages/Dashboard/Monsters/NewMonster';
+import MonsterDetail from './pages/Dashboard/Monsters/MonsterDetail';
+import MonsterStatBlock from './pages/Dashboard/Monsters/MonsterStatBlock';
+import MonsterPlayerView from './pages/Dashboard/Monsters/MonsterPlayerView';
 import Sessions from './pages/Dashboard/Sessions/Sessions';
 import SessionDetail from './pages/Dashboard/Sessions/SessionDetail';
 import SessionTheatre from './pages/Dashboard/Theatre/SessionTheatre';
@@ -55,6 +60,11 @@ const App = () => {
             <Route path="campaigns/:id/players/:playerId" element={<PlayerProfile />} />
             <Route path="items" element={<Items />} />
             <Route path="items/:id" element={<ItemDetail />} />
+            <Route path="monsters" element={<Monsters />} />
+            <Route path="monsters/new" element={<NewMonster />} />
+            <Route path="monsters/bestiary/:id" element={<MonsterStatBlock />} />
+            <Route path="monsters/campaign/:campaignId/:id" element={<MonsterPlayerView />} />
+            <Route path="monsters/:id" element={<MonsterDetail />} />
             <Route path="sessions" element={<Sessions />} />
             <Route path="theatre" element={<SessionTheatre />} />
             <Route path="sessions/:id" element={<SessionDetail />} />

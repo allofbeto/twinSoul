@@ -41,6 +41,10 @@ export const deleteItem = (id: string) => api.delete(`/items/${id}`);
 
 export const migrateInventory = (characterId: string, actionType: string) => api.post(`/characters/${characterId}/migrate_inventory`, { action_type: actionType });
 
+// Monsters (shared SRD bestiary)
+export const getMonsters = () => api.get('/monsters');
+export const getMonster = (id: string) => api.get(`/monsters/${id}`);
+
 // Players
 export const getPlayers = (campaignId: string) => api.get(`/campaigns/${campaignId}/players`);
 export const addPlayer = (campaignId: string, data: object) => api.post(`/campaigns/${campaignId}/players`, data);

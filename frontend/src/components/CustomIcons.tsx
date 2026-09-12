@@ -133,6 +133,41 @@ const icons = {
       </svg>
     ),
   
+    monster: (color = "currentColor") => (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M6 10c0-3.9 2.7-7 6-7s6 3.1 6 7v5c0 3.3-2.7 6-6 6s-6-2.7-6-6v-5Z"
+          stroke={color}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M4 9l2 2M20 9l-2 2"
+          stroke={color}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+        <path
+          d="M9.5 12v2.2M14.5 12v2.2"
+          stroke={color}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+        <path
+          d="M9 17.5l1-2h4l1 2"
+          stroke={color}
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+
     sessions: (color = "currentColor") => (
       <svg
         viewBox="0 0 24 24"

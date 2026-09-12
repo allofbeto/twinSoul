@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_09_03_141132) do
+ActiveRecord::Schema[7.0].define(version: 2026_09_03_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -96,9 +96,56 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_03_141132) do
     t.integer "intelligence", default: 10
     t.integer "wisdom", default: 10
     t.integer "charisma", default: 10
+    t.jsonb "traits", default: []
+    t.jsonb "actions", default: []
+    t.jsonb "legendary_actions", default: []
+    t.string "visible_sections", default: [], array: true
     t.index ["campaign_id"], name: "index_items_on_campaign_id"
     t.index ["inventory_id"], name: "index_items_on_inventory_id"
     t.index ["user_id"], name: "index_items_on_user_id"
+  end
+
+  create_table "monsters", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "index", null: false
+    t.string "name", null: false
+    t.string "size"
+    t.string "creature_type"
+    t.string "alignment"
+    t.integer "armor_class"
+    t.string "armor_desc"
+    t.integer "hit_points"
+    t.string "hit_dice"
+    t.jsonb "speed", default: {}
+    t.integer "strength"
+    t.integer "dexterity"
+    t.integer "constitution"
+    t.integer "intelligence"
+    t.integer "wisdom"
+    t.integer "charisma"
+    t.jsonb "saving_throws", default: {}
+    t.jsonb "skills", default: {}
+    t.string "damage_vulnerabilities", default: [], array: true
+    t.string "damage_resistances", default: [], array: true
+    t.string "damage_immunities", default: [], array: true
+    t.string "condition_immunities", default: [], array: true
+    t.jsonb "senses", default: {}
+    t.string "languages"
+    t.string "challenge_rating"
+    t.float "cr_numeric"
+    t.integer "proficiency_bonus"
+    t.integer "xp"
+    t.jsonb "special_abilities", default: []
+    t.jsonb "actions", default: []
+    t.jsonb "legendary_actions", default: []
+    t.jsonb "reactions", default: []
+    t.string "image_url"
+    t.string "source", default: "SRD 5.1"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["cr_numeric"], name: "index_monsters_on_cr_numeric"
+    t.index ["creature_type"], name: "index_monsters_on_creature_type"
+    t.index ["index"], name: "index_monsters_on_index", unique: true
+    t.index ["name"], name: "index_monsters_on_name"
   end
 
   create_table "players", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
