@@ -117,6 +117,8 @@ const NewEncounter = () => {
             name: c.name,
             challenge_rating: c.challenge_rating || null,
             xp: c.xp,
+            max_hp: c.max_hp ?? null,
+            armor_class: c.armor_class ?? null,
             quantity: c.quantity,
           })),
         })),

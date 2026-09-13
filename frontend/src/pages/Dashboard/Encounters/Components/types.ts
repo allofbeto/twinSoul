@@ -8,6 +8,8 @@ export interface CombatantRow {
   name: string;
   challenge_rating?: string;
   xp: number;
+  max_hp?: number | null;
+  armor_class?: number | null;
   quantity: number;
   notes?: string;
   source: CombatantSource;
@@ -32,6 +34,8 @@ export interface BestiaryOption {
   challenge_rating: string;
   cr_numeric: number;
   xp: number;
+  hit_points: number;
+  armor_class: number;
   habitats: string[];
 }
 
@@ -40,6 +44,8 @@ export interface HomebrewOption {
   name: string;
   kind: string;
   challenge_rating: string | null;
+  max_hp: number | null;
+  armor_class: number | null;
 }
 
 export interface SessionOption {

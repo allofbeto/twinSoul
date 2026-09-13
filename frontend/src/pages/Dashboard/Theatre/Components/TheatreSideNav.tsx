@@ -13,6 +13,8 @@ interface TheatreSideNavProps {
   onExit?: () => void;
   notesOpen: boolean;
   onToggleNotes: () => void;
+  initiativeOpen: boolean;
+  onToggleInitiative: () => void;
   trayOpen: boolean;
   onToggleTray: () => void;
   tab: AssetKind;
@@ -27,6 +29,8 @@ export default function TheatreSideNav({
   onExit,
   notesOpen,
   onToggleNotes,
+  initiativeOpen,
+  onToggleInitiative,
   trayOpen,
   onToggleTray,
   tab,
@@ -74,9 +78,9 @@ export default function TheatreSideNav({
 
       <button
         type="button"
-        className={`theatre__sidenav-btn ${panel === 'initiative' ? 'is-on' : ''}`}
-        onClick={() => onTogglePanel('initiative')}
-        aria-pressed={panel === 'initiative'}
+        className={`theatre__sidenav-btn ${initiativeOpen ? 'is-on' : ''}`}
+        onClick={onToggleInitiative}
+        aria-pressed={initiativeOpen}
         data-tooltip={`Initiative${combatantCount > 0 ? ` · ${combatantCount}` : ''}`}
       >
         <i className="bx bx-list-ol" aria-hidden="true" />

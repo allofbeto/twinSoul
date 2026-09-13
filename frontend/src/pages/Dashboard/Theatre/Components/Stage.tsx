@@ -41,6 +41,10 @@ export default function Stage({ stage, onClear, onDropAsset, onRemoveAsset, onMo
 
   const canDrop = !readOnly && !!onDropAsset;
 
+  // Encounter-kind assets get a full-theatre takeover (rendered one level up,
+  // in SessionTheatre) instead of a small draggable card here.
+  const gridAssets = stage.filter((a) => a.kind !== 'encounter');
+
   const getPos = useCallback(
     (asset: StagedAsset) => localPositions[asset.instanceId] ?? { x: asset.x, y: asset.y },
     [localPositions],
@@ -139,7 +143,7 @@ export default function Stage({ stage, onClear, onDropAsset, onRemoveAsset, onMo
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
     >
-      {stage.length > 0 ? (
+      {gridAssets.length > 0 ? (
         <>
           {!readOnly && (
             <div className="theatre__stage-toolbar">
@@ -150,7 +154,7 @@ export default function Stage({ stage, onClear, onDropAsset, onRemoveAsset, onMo
           )}
 
           <div className="theatre__stage-surface">
-            {stage.map((asset) => {
+            {gridAssets.map((asset) => {
               const pos = getPos(asset);
               return (
               <div

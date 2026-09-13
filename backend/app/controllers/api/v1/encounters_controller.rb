@@ -54,7 +54,8 @@ class Api::V1::EncountersController < ApplicationController
       encounter_phases_attributes: [
         :id, :name, :position, :notes, :_destroy,
         encounter_monsters_attributes: [
-          :id, :monster_id, :item_id, :name, :challenge_rating, :xp, :quantity, :notes, :_destroy
+          :id, :monster_id, :item_id, :name, :challenge_rating, :xp, :max_hp, :armor_class,
+          :quantity, :notes, :_destroy
         ]
       ]
     )

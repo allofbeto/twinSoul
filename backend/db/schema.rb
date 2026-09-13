@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_09_12_204509) do
+ActiveRecord::Schema[7.0].define(version: 2026_09_12_215423) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -66,6 +66,8 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_12_204509) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.uuid "encounter_phase_id", null: false
+    t.integer "max_hp"
+    t.integer "armor_class"
     t.index ["encounter_phase_id"], name: "index_encounter_monsters_on_encounter_phase_id"
     t.index ["item_id"], name: "index_encounter_monsters_on_item_id"
     t.index ["monster_id"], name: "index_encounter_monsters_on_monster_id"

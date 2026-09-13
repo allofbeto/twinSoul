@@ -109,17 +109,20 @@
   
   /* ---- Body layout ------------------------------------------------ */
   .theatre__body {
+    position: relative;
     display: flex; gap: 0;
     padding: var(--gap); min-height: 0; overflow: hidden;
   }
   .theatre__notes,
-  .theatre__tray {
+  .theatre__tray,
+  .theatre__initiative-col {
     flex: 0 0 auto;
     background: var(--panel); border: 1px solid var(--border);
     border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column;
   }
   .theatre__notes { width: var(--notes-w, 300px); }
   .theatre__tray { width: var(--tray-w, 300px); }
+  .theatre__initiative-col { width: var(--initiative-w, 300px); padding: 12px; }
   
   .theatre__handle {
     flex: 0 0 10px; align-self: stretch; cursor: col-resize;
@@ -385,8 +388,15 @@
   .theatre__roll-detail { font-family: var(--font-data); font-size: 0.78rem; color: var(--ink-dim); }
   
   /* Initiative */
-  .theatre__init-add { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-  .theatre__init-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+  /* Fills whatever height its container gives it (a fixed 60vh flyout, or
+     the full encounter takeover card) — only the list itself scrolls. */
+  .theatre__init { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .theatre__init-add { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; flex: 0 0 auto; }
+  .theatre__init-list {
+    list-style: none; margin: 0; padding: 0 2px 0 0;
+    display: flex; flex-direction: column; gap: 5px;
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  }
   .theatre__combatant {
     display: flex; align-items: center; gap: 10px;
     padding: 6px 8px; border-radius: var(--radius);
@@ -395,9 +405,15 @@
   .theatre__combatant.is-turn { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
   .theatre__combatant.is-enemy .theatre__combatant-name { color: var(--enemy); }
   .theatre__combatant.is-down { opacity: 0.5; }
-  .theatre__init-badge {
+  .theatre__combatant.is-drop-target { border-color: var(--accent); border-style: dashed; }
+  .theatre__drag-handle {
+    cursor: grab; color: var(--ink-dim); font-size: 0.9rem; line-height: 1;
+    flex: 0 0 auto; touch-action: none; user-select: none;
+  }
+  .theatre__drag-handle:active { cursor: grabbing; }
+  .theatre__init-badge-input {
     font-family: var(--font-display); font-size: 0.95rem; color: var(--accent);
-    min-width: 30px; text-align: center;
+    width: 36px; text-align: center; padding: 2px 0; flex: 0 0 auto;
   }
   .theatre__combatant-name { flex: 1; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .theatre__hp { display: flex; align-items: center; gap: 6px; }
@@ -423,7 +439,104 @@
     padding: 10px 12px; font: inherit; font-size: 0.86rem; line-height: 1.5;
   }
   .theatre__scratch:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  
+
+  /* Encounter takeover: revealing an encounter dominates the whole stage. */
+  /* One flat surface — no card nested inside a card. The outer element
+     supplies the single border/background; everything inside is plain
+     layout (full-width header, then the tracker filling the rest). */
+  .theatre__encounter-takeover {
+    flex: 1 1 auto; min-width: 0; min-height: 0; position: relative;
+    display: flex;
+    background: radial-gradient(120% 90% at 50% 0%, var(--panel-2), var(--panel));
+    border: 1px solid var(--accent); border-radius: var(--radius);
+    overflow: hidden;
+    animation: rise 0.2s ease;
+  }
+  .theatre__encounter-takeover-minimize {
+    position: absolute; top: 14px; right: 14px; z-index: 5;
+    appearance: none; cursor: pointer; width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--panel); color: var(--ink-dim);
+    border: 1px solid var(--border); border-radius: 999px; font-size: 1rem;
+  }
+  .theatre__encounter-takeover-minimize:hover { color: var(--ink); border-color: var(--accent); }
+  .theatre__encounter-takeover-card {
+    width: 100%; min-height: 0;
+    display: flex; flex-direction: column;
+  }
+  .theatre__encounter-takeover-head {
+    flex: 0 0 auto; padding: 22px 60px 18px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .theatre__encounter-takeover-head-row {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .theatre__encounter-takeover-heading { min-width: 0; }
+  .theatre__encounter-takeover-title {
+    font-family: var(--font-display); font-size: 1.6rem; margin: 0 0 4px; color: var(--ink);
+  }
+  .theatre__encounter-takeover-sub { color: var(--ink-dim); font-size: 0.88rem; margin: 0; }
+  .theatre__encounter-takeover-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .theatre__encounter-monster-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; padding: 5px 8px 5px 12px; }
+  .theatre__encounter-monster-view {
+    appearance: none; cursor: pointer; width: 18px; height: 18px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent; color: inherit; border: none; opacity: 0.75; font-size: 0.85rem;
+  }
+  .theatre__encounter-monster-view:hover { opacity: 1; }
+  .theatre__encounter-takeover-actions { display: flex; gap: 10px; flex: 0 0 auto; }
+  .theatre__encounter-takeover-initiative {
+    flex: 1 1 auto; min-height: 0; overflow: hidden;
+    display: flex; flex-direction: column;
+    padding: 16px 20px; text-align: left;
+  }
+
+  /* Combat tracker: 1/3 initiative order + 2/3 selected combatant's details. */
+  .theatre__combat-tracker { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .theatre__combat-columns { flex: 1 1 auto; min-height: 0; display: flex; gap: 16px; }
+  .theatre__combat-list {
+    flex: 0 0 33%; max-width: 33%; min-width: 0;
+    list-style: none; margin: 0; padding: 0 4px 0 0;
+    display: flex; flex-direction: column; gap: 5px;
+    overflow-y: auto;
+  }
+  .theatre__combat-row { cursor: pointer; padding: 6px; gap: 6px; }
+  .theatre__combat-row.is-selected:not(.is-turn) { border-color: var(--ink-dim); background: var(--panel); }
+  /* Tight quarters in a 1/3-width column: shrink everything that can shrink. */
+  .theatre__combat-row .theatre__init-badge-input { width: 28px; font-size: 0.85rem; }
+  .theatre__combat-row .theatre__combatant-name { flex: 0 1 auto; font-size: 0.82rem; }
+  .theatre__combat-row .theatre__ac-badge { font-size: 0.66rem; padding: 1px 6px; }
+  .theatre__combat-row .theatre__hp { gap: 3px; }
+  .theatre__combat-row .theatre__hp-track { width: 32px; }
+  .theatre__combat-row .theatre__hp-num { min-width: 0; font-size: 0.66rem; }
+  .theatre__ac-badge {
+    font-family: var(--font-data); font-size: 0.72rem; color: var(--ink-dim);
+    border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; flex: 0 0 auto;
+  }
+  .theatre__combat-detail {
+    flex: 1 1 auto; min-width: 0; overflow-y: auto;
+    border-left: 1px solid var(--border); padding-left: 16px;
+  }
+  .theatre__combat-detail-head {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+    margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
+  }
+  .theatre__combat-detail-name {
+    font-family: var(--font-display); font-size: 1.3rem; margin: 0; color: var(--ink); flex: 1 1 auto;
+  }
+  .theatre__combat-detail-stats { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+  .theatre__combat-detail-hp-controls { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+  .theatre__combat-detail-statblock { font-size: 0.85rem; }
+  .theatre__encounter-restore {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 20;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--panel-2); border: 1px solid var(--accent); border-radius: 999px;
+    box-shadow: var(--shadow);
+    color: var(--ink); font-size: 0.82rem; padding: 8px 14px;
+    cursor: pointer; appearance: none;
+  }
+  .theatre__encounter-restore:hover { border-color: var(--ink); }
+
   /* ---- Theatre sidenav (Exit / Notes / tools / Tray) --------------- */
   .theatre__sidenav-anchor { position: relative; flex: 0 0 auto; align-self: stretch; }
   .theatre__sidenav {

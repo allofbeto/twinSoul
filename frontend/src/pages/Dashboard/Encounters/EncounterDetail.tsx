@@ -25,6 +25,8 @@ interface EncounterMonsterDto {
   name: string;
   challenge_rating: string | null;
   xp: number;
+  max_hp: number | null;
+  armor_class: number | null;
   quantity: number;
 }
 
@@ -53,6 +55,8 @@ const toRow = (m: EncounterMonsterDto): CombatantRow => ({
   name: m.name,
   challenge_rating: m.challenge_rating || undefined,
   xp: m.xp,
+  max_hp: m.max_hp,
+  armor_class: m.armor_class,
   quantity: m.quantity,
   source: m.monster_id ? 'bestiary' : m.item_id ? 'homebrew' : 'custom',
 });
@@ -250,6 +254,8 @@ const EncounterDetail = () => {
             name: c.name,
             challenge_rating: c.challenge_rating || null,
             xp: c.xp,
+            max_hp: c.max_hp ?? null,
+            armor_class: c.armor_class ?? null,
             quantity: c.quantity,
             _destroy: c._destroy || undefined,
           })),

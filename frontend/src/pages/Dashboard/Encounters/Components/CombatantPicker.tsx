@@ -25,6 +25,8 @@ const CombatantPicker = ({ bestiary, homebrew, combatants, onAdd, onRemove }: Pr
   const [selectedId, setSelectedId] = useState('');
   const [customName, setCustomName] = useState('');
   const [customCr, setCustomCr] = useState(CR_OPTIONS[0]);
+  const [customHp, setCustomHp] = useState('10');
+  const [customAc, setCustomAc] = useState('10');
   const [customQuantity, setCustomQuantity] = useState(1);
   const [detailMonsterId, setDetailMonsterId] = useState<string | null>(null);
 
@@ -52,6 +54,8 @@ const CombatantPicker = ({ bestiary, homebrew, combatants, onAdd, onRemove }: Pr
       name: m.name,
       challenge_rating: m.challenge_rating,
       xp: m.xp,
+      max_hp: m.hit_points,
+      armor_class: m.armor_class,
       quantity: quantityFor(m.id),
       source: 'bestiary',
     });
@@ -67,6 +71,8 @@ const CombatantPicker = ({ bestiary, homebrew, combatants, onAdd, onRemove }: Pr
       name: m.name,
       challenge_rating: m.challenge_rating || undefined,
       xp: xpForChallengeRating(m.challenge_rating),
+      max_hp: m.max_hp,
+      armor_class: m.armor_class,
       quantity: quantityFor(m.id),
       source: 'homebrew',
     });
@@ -81,6 +87,8 @@ const CombatantPicker = ({ bestiary, homebrew, combatants, onAdd, onRemove }: Pr
       name: trimmed,
       challenge_rating: customCr,
       xp: xpForChallengeRating(customCr),
+      max_hp: Math.max(1, parseInt(customHp, 10) || 1),
+      armor_class: Math.max(1, parseInt(customAc, 10) || 1),
       quantity: customQuantity,
       source: 'custom',
     });
@@ -232,7 +240,7 @@ const CombatantPicker = ({ bestiary, homebrew, combatants, onAdd, onRemove }: Pr
 
       {tab === 'custom' && (
         <div className="row g-2 align-items-end">
-          <div className="col-md-6">
+          <div className="col-md-5">
             <label className="form-label text-muted-theme">Name</label>
             <input
               type="text"
@@ -242,7 +250,7 @@ const CombatantPicker = ({ bestiary, homebrew, combatants, onAdd, onRemove }: Pr
               onChange={(e) => setCustomName(e.target.value)}
             />
           </div>
-          <div className="col-md-3">
+          <div className="col-md-2">
             <label className="form-label text-muted-theme">Challenge Rating</label>
             <select
               className="form-select input-theme"
@@ -253,6 +261,26 @@ const CombatantPicker = ({ bestiary, homebrew, combatants, onAdd, onRemove }: Pr
                 <option key={cr} value={cr}>{cr}</option>
               ))}
             </select>
+          </div>
+          <div className="col-md-1">
+            <label className="form-label text-muted-theme">HP</label>
+            <input
+              type="number"
+              min={1}
+              className="form-control input-theme"
+              value={customHp}
+              onChange={(e) => setCustomHp(e.target.value)}
+            />
+          </div>
+          <div className="col-md-1">
+            <label className="form-label text-muted-theme">AC</label>
+            <input
+              type="number"
+              min={1}
+              className="form-control input-theme"
+              value={customAc}
+              onChange={(e) => setCustomAc(e.target.value)}
+            />
           </div>
           <div className="col-md-1">
             <label className="form-label text-muted-theme">Qty</label>

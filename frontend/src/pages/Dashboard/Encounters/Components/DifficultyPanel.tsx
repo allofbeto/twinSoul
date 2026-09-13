@@ -72,6 +72,8 @@ const DifficultyPanel = ({ combatants, campaignId, onQuantityChange, onRemove, o
                 </div>
                 <div className="text-muted-theme" style={{ fontSize: '0.75rem' }}>
                   {SOURCE_LABEL[c.source]}{c.challenge_rating ? ` · CR ${c.challenge_rating}` : ''} · {c.xp.toLocaleString()} xp ea.
+                  {c.max_hp ? ` · ${c.max_hp} HP` : ''}
+                  {c.armor_class ? ` · AC ${c.armor_class}` : ''}
                 </div>
               </div>
               {c.monster_id && (

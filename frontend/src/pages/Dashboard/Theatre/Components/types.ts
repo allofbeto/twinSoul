@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { MutableRefObject, ReactNode } from 'react';
 
 export type TheatreTheme = 'default' | 'dos' | 'magic';
 
@@ -33,6 +33,20 @@ export interface RevealAsset {
   /** Stat block, read-aloud text, tactics — anything text-heavy. */
   body?: string;
   tags?: string[];
+  /** Encounter-kind assets only: the phase's monster list, embedded so the
+   * encounter takeover can offer "Roll Initiative" and stat-block lookups
+   * without fetching anything else. */
+  combatants?: EncounterCombatantSeed[];
+}
+
+export interface EncounterCombatantSeed {
+  name: string;
+  quantity: number;
+  maxHp: number | null;
+  armorClass: number | null;
+  /** Bestiary monster id, when this combatant came from the SRD — lets the
+   * DM pull up its full stat block mid-fight. Null for homebrew/custom. */
+  monsterId: string | null;
 }
 
 /** A RevealAsset placed on the stage. Multiple copies of the same asset can be
@@ -60,7 +74,11 @@ export interface Combatant {
   init: number;
   hp: number;
   maxHp: number;
+  armorClass?: number | null;
   isEnemy?: boolean;
+  /** Bestiary monster id, when added from an encounter — lets the DM view
+   * its stat block from the initiative list. */
+  monsterId?: string | null;
 }
 
 export interface Session {
@@ -94,7 +112,66 @@ export interface RollResult {
   detail: string;
 }
 
-export type DmPanel = null | 'dice' | 'initiative' | 'scratch';
+export type DmPanel = null | 'dice' | 'scratch';
+
+export interface TheatreEncounterMonster {
+  id: string;
+  name: string;
+  challengeRating: string | null;
+  maxHp: number | null;
+  armorClass: number | null;
+  quantity: number;
+  monsterId: string | null;
+}
+
+export interface TheatreEncounterPhase {
+  id: string;
+  name: string;
+  position: number;
+  notes?: string;
+  monsters: TheatreEncounterMonster[];
+}
+
+export interface TheatreEncounter {
+  id: string;
+  name: string;
+  notes?: string;
+  campaignId: string | null;
+  sessionId: string | null;
+  phases: TheatreEncounterPhase[];
+}
+
+/** Everything the initiative tracker needs — bundled so it can be rendered
+ * from either the sidenav flyout or embedded full-height in the encounter
+ * takeover without threading a dozen individual props through both. */
+export interface InitiativeState {
+  combatants: Combatant[];
+  turn: number;
+  cName: string;
+  cInit: string;
+  cHp: string;
+  cAc: string;
+  cEnemy: boolean;
+  onNameChange: (value: string) => void;
+  onInitChange: (value: string) => void;
+  onHpChange: (value: string) => void;
+  onAcChange: (value: string) => void;
+  onToggleEnemy: () => void;
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+  onApplyHp: (id: string, delta: number) => void;
+  onEditInit: (id: string, init: number) => void;
+  onReorder: (draggedId: string, targetId: string) => void;
+  /** Backfills a combatant's AC/HP from its bestiary monster record when the
+   * encounter snapshot didn't have them (e.g. an encounter built before AC/HP
+   * snapshotting existed). Only fills gaps — never overwrites a value the DM
+   * already set. */
+  onInheritStats: (id: string, stats: { armorClass: number | null; maxHp: number }) => void;
+  onViewMonster?: (monsterId: string) => void;
+  onNextTurn: () => void;
+  onReset: () => void;
+  dmgRefs: MutableRefObject<Record<string, string>>;
+}
 
 export const KIND_LABEL: Record<AssetKind, string> = {
   art: 'Art', map: 'Maps', npc: 'NPCs', encounter: 'Encounters', item: 'Items',

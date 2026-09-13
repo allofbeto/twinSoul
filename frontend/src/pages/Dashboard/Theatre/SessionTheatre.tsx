@@ -8,6 +8,7 @@ import type {
 import { useAuth } from '../../../context/AuthContext';
 import {
   getCampaigns, createCampaign, getSessions, createSession, getCampaignItems, createCampaignItem, updateSession,
+  getEncounters,
 } from '../../../api/backendHelpers'; // ← adjust path
 import '../../../styles/SessionTheatre.css';
 import '../../../styles/theatreGate.css';
@@ -17,11 +18,14 @@ import type {
   Campaign,
   Combatant,
   DmPanel,
+  InitiativeState,
   NewItemInput,
   RevealAsset,
   RollResult,
   Session,
   SessionTheatreProps,
+  StagedAsset,
+  TheatreEncounter,
 } from './Components/types';
 import { PANE_DEFAULT, PANE_MAX, PANE_MIN, clamp, coerceTheme } from './Components/types';
 import { rollExpression } from './Components/dice';
@@ -36,7 +40,9 @@ import TheatreSideNav from './Components/TheatreSideNav';
 import DicePanel from './Components/DicePanel';
 import InitiativePanel from './Components/InitiativePanel';
 import ScratchPanel from './Components/ScratchPanel';
+import EncounterTakeover from './Components/EncounterTakeover';
 import TheatreNotesEditor from './Components/TheatreNotesEditor';
+import MonsterDetailSlideOver from '../Monsters/Components/MonsterDetailSlideOver';
 
 let idSeed = 0;
 const nextId = () => `c${(idSeed += 1)}`;
@@ -69,6 +75,36 @@ function normalizeItem(raw: any): RevealAsset {
     subtitle: categories?.join(', '),
     body: raw.notes ?? undefined,
     tags: categories,
+  };
+}
+
+// Maps raw encounter JSON (with nested phases/monsters) → a TheatreEncounter.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeEncounter(raw: any): TheatreEncounter {
+  return {
+    id: String(raw.id),
+    name: raw.name ?? 'Untitled encounter',
+    notes: raw.notes ?? undefined,
+    campaignId: raw.campaign_id ? String(raw.campaign_id) : null,
+    sessionId: raw.session_id ? String(raw.session_id) : null,
+    phases: [...(raw.encounter_phases ?? [])]
+      .sort((a, b) => a.position - b.position)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((p: any) => ({
+        id: String(p.id),
+        name: p.name ?? 'Phase',
+        position: p.position ?? 0,
+        notes: p.notes ?? undefined,
+        monsters: (p.encounter_monsters ?? []).map((m: any) => ({
+          id: String(m.id),
+          name: m.name,
+          challengeRating: m.challenge_rating ?? null,
+          maxHp: m.max_hp ?? null,
+          armorClass: m.armor_class ?? null,
+          quantity: m.quantity ?? 1,
+          monsterId: m.monster_id ? String(m.monster_id) : null,
+        })),
+      })),
   };
 }
 
@@ -108,6 +144,26 @@ export default function SessionTheatre({
       .catch(() => { if (alive) setCampaignItems([]); });
     return () => { alive = false; };
   }, [selected]);
+
+  // Encounters buildable for this campaign — revealable once a session is active.
+  const [campaignEncounters, setCampaignEncounters] = useState<TheatreEncounter[]>([]);
+
+  useEffect(() => {
+    if (!selected || selected.role === 'player') { setCampaignEncounters([]); return; }
+    let alive = true;
+    getEncounters({ campaignId: selected.id })
+      .then((res) => { if (alive) setCampaignEncounters(res.data.map(normalizeEncounter)); })
+      .catch(() => { if (alive) setCampaignEncounters([]); });
+    return () => { alive = false; };
+  }, [selected]);
+
+  // Encounters relevant to this specific session: tied to it directly, or
+  // not yet tied to any session at all (so nothing gets hidden just because
+  // the DM hasn't linked it up front).
+  const sessionEncounters = useMemo(
+    () => campaignEncounters.filter((e) => !e.sessionId || e.sessionId === activeSession?.id),
+    [campaignEncounters, activeSession]
+  );
 
   useEffect(() => {
     if (activeCampaign) return;
@@ -156,18 +212,34 @@ export default function SessionTheatre({
     return created;
   }, [selected]);
 
-  // Resizable panes.
+  // Resizable panes. Initiative and Notes sit on the left of the stage (grow
+  // when dragged right); the Tray sits on the right (grows when dragged left).
+  type PaneKind = 'initiative' | 'notes' | 'tray';
+  const [initiativeW, setInitiativeW] = useState(PANE_DEFAULT);
   const [notesW, setNotesW] = useState(PANE_DEFAULT);
   const [trayW, setTrayW] = useState(PANE_DEFAULT);
-  const dragRef = useRef<{ kind: 'notes' | 'tray'; startX: number; startW: number } | null>(null);
+  const dragRef = useRef<{ kind: PaneKind; startX: number; startW: number } | null>(null);
+
+  const widthFor = useCallback((kind: PaneKind) => {
+    if (kind === 'initiative') return initiativeW;
+    if (kind === 'notes') return notesW;
+    return trayW;
+  }, [initiativeW, notesW, trayW]);
+
+  const setWidthFor = useCallback((kind: PaneKind, next: number) => {
+    if (kind === 'initiative') setInitiativeW(next);
+    else if (kind === 'notes') setNotesW(next);
+    else setTrayW(next);
+  }, []);
 
   const onDragMove = useCallback((e: PointerEvent) => {
     const d = dragRef.current;
     if (!d) return;
     const delta = e.clientX - d.startX;
-    const next = clamp(d.kind === 'notes' ? d.startW + delta : d.startW - delta, PANE_MIN, PANE_MAX);
-    if (d.kind === 'notes') setNotesW(next); else setTrayW(next);
-  }, []);
+    const grows = d.kind !== 'tray';
+    const next = clamp(grows ? d.startW + delta : d.startW - delta, PANE_MIN, PANE_MAX);
+    setWidthFor(d.kind, next);
+  }, [setWidthFor]);
 
   const endDrag = useCallback(() => {
     dragRef.current = null;
@@ -178,27 +250,28 @@ export default function SessionTheatre({
   }, [onDragMove]);
 
   const startResize = useCallback(
-    (kind: 'notes' | 'tray') => (e: ReactPointerEvent) => {
+    (kind: PaneKind) => (e: ReactPointerEvent) => {
       e.preventDefault();
-      dragRef.current = { kind, startX: e.clientX, startW: kind === 'notes' ? notesW : trayW };
+      dragRef.current = { kind, startX: e.clientX, startW: widthFor(kind) };
       window.addEventListener('pointermove', onDragMove);
       window.addEventListener('pointerup', endDrag);
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
     },
-    [notesW, trayW, onDragMove, endDrag],
+    [widthFor, onDragMove, endDrag],
   );
 
-  const onHandleKey = useCallback((kind: 'notes' | 'tray', e: ReactKeyboardEvent) => {
+  const onHandleKey = useCallback((kind: PaneKind, e: ReactKeyboardEvent) => {
     const step = e.shiftKey ? 48 : 16;
-    const grow = kind === 'notes' ? 'ArrowRight' : 'ArrowLeft';
-    const shrink = kind === 'notes' ? 'ArrowLeft' : 'ArrowRight';
-    const set = kind === 'notes' ? setNotesW : setTrayW;
-    if (e.key === grow) { e.preventDefault(); set((w) => clamp(w + step, PANE_MIN, PANE_MAX)); }
-    else if (e.key === shrink) { e.preventDefault(); set((w) => clamp(w - step, PANE_MIN, PANE_MAX)); }
-  }, []);
+    const grows = kind !== 'tray';
+    const grow = grows ? 'ArrowRight' : 'ArrowLeft';
+    const shrink = grows ? 'ArrowLeft' : 'ArrowRight';
+    if (e.key === grow) { e.preventDefault(); setWidthFor(kind, clamp(widthFor(kind) + step, PANE_MIN, PANE_MAX)); }
+    else if (e.key === shrink) { e.preventDefault(); setWidthFor(kind, clamp(widthFor(kind) - step, PANE_MIN, PANE_MAX)); }
+  }, [widthFor, setWidthFor]);
 
   const rootStyle = {
+    '--initiative-w': `${initiativeW}px`,
     '--notes-w': `${notesW}px`,
     '--tray-w': `${trayW}px`,
   } as unknown as CSSProperties;
@@ -210,8 +283,21 @@ export default function SessionTheatre({
     token,
   });
   const stagedIds = useMemo(() => new Set(stage.map((s) => s.id)), [stage]);
+
+  // A revealed encounter takes over the whole theatre (sidenav aside) until
+  // minimized or ended. Minimizing is purely local — it doesn't touch the
+  // shared stage, so players keep seeing the reveal either way.
+  const encounterAsset = useMemo(() => stage.find((a) => a.kind === 'encounter'), [stage]);
+  const [encounterMinimized, setEncounterMinimized] = useState(false);
+  useEffect(() => {
+    setEncounterMinimized(false);
+  }, [encounterAsset?.instanceId]);
+
+  const [viewMonsterId, setViewMonsterId] = useState<string | null>(null);
+
   const [tab, setTab] = useState<AssetKind>('art');
   const [notesOpen, setNotesOpen] = useState(true);
+  const [initiativeOpen, setInitiativeOpen] = useState(false);
   const [trayOpen, setTrayOpen] = useState(true);
   const [panel, setPanel] = useState<DmPanel>(null);
 
@@ -226,6 +312,7 @@ export default function SessionTheatre({
   const [cName, setCName] = useState('');
   const [cInit, setCInit] = useState('');
   const [cHp, setCHp] = useState('');
+  const [cAc, setCAc] = useState('');
   const [cEnemy, setCEnemy] = useState(true);
 
   // Scratch
@@ -238,7 +325,32 @@ export default function SessionTheatre({
     onCampaignSelected?.(c);
   }, [onCampaignSelected]);
 
-  const allAssets = useMemo(() => [...assets, ...campaignItems], [assets, campaignItems]);
+  // Each phase of a session-relevant encounter becomes a revealable tray
+  // card — dragging/revealing it works exactly like any other asset, since
+  // the Stage and Tray don't know or care that it's an encounter under the
+  // hood. `combatants` rides along so the Stage takeover can roll initiative
+  // without looking anything up.
+  const encounterAssets = useMemo<RevealAsset[]>(
+    () =>
+      sessionEncounters.flatMap((enc) =>
+        enc.phases.map((phase) => ({
+          id: `${enc.id}::${phase.id}`,
+          kind: 'encounter' as const,
+          title: enc.phases.length > 1 ? `${enc.name} — ${phase.name}` : enc.name,
+          subtitle: phase.notes,
+          tags: phase.monsters.map((m) => (m.quantity > 1 ? `${m.name} ×${m.quantity}` : m.name)),
+          combatants: phase.monsters.map((m) => ({
+            name: m.name, quantity: m.quantity, maxHp: m.maxHp, armorClass: m.armorClass, monsterId: m.monsterId,
+          })),
+        }))
+      ),
+    [sessionEncounters]
+  );
+
+  const allAssets = useMemo(
+    () => [...assets, ...campaignItems.filter((i) => i.kind !== 'encounter'), ...encounterAssets],
+    [assets, campaignItems, encounterAssets]
+  );
 
   const trayItems = useMemo(
     () => allAssets.filter((a) => a.kind === tab),
@@ -264,18 +376,28 @@ export default function SessionTheatre({
     if (result) setRolls((prev) => [result, ...prev].slice(0, 8));
   }, []);
 
-  /* --- initiative handlers --- */
+  /* --- initiative handlers ---
+   * Order is manual/drag-driven, not auto-sorted by init: adding or editing
+   * a value only updates that row, so it never undoes how the DM arranged
+   * the list. */
+  // Init is optional: a last-minute addition (a walk-on NPC, a monster that
+  // shows up mid-fight) can be dropped in with just a name — its initiative
+  // gets auto-rolled — or the DM can type a known value to override that.
   const addCombatant = useCallback(() => {
     const name = cName.trim();
-    const init = parseInt(cInit, 10);
-    if (!name || Number.isNaN(init)) return;
+    if (!name) return;
+    const typedInit = parseInt(cInit, 10);
+    const init = Number.isNaN(typedInit) ? rollExpression('1d20')?.total ?? 10 : typedInit;
     const hp = parseInt(cHp, 10);
     const safeHp = Number.isNaN(hp) ? 0 : hp;
-    setCombatants((prev) =>
-      [...prev, { id: nextId(), name, init, hp: safeHp, maxHp: safeHp, isEnemy: cEnemy }]
-        .sort((a, b) => b.init - a.init));
-    setCName(''); setCInit(''); setCHp('');
-  }, [cName, cInit, cHp, cEnemy]);
+    const ac = parseInt(cAc, 10);
+    const safeAc = Number.isNaN(ac) ? null : ac;
+    setCombatants((prev) => [
+      ...prev,
+      { id: nextId(), name, init, hp: safeHp, maxHp: safeHp, armorClass: safeAc, isEnemy: cEnemy },
+    ]);
+    setCName(''); setCInit(''); setCHp(''); setCAc('');
+  }, [cName, cInit, cHp, cAc, cEnemy]);
 
   const removeCombatant = useCallback((id: string) => {
     setCombatants((prev) => {
@@ -295,6 +417,91 @@ export default function SessionTheatre({
   }, [combatants.length]);
 
   const resetCombat = useCallback(() => { setCombatants([]); setTurn(0); }, []);
+
+  // Drops a revealed encounter's monsters into the tracker — one entry per
+  // creature (a quantity of 3 becomes "Goblin 1/2/3"), each with a rolled
+  // initiative and its snapshotted HP, if any.
+  const handleRollInitiative = useCallback((asset: StagedAsset) => {
+    const added: Combatant[] = (asset.combatants ?? []).flatMap((m) => {
+      const hp = m.maxHp ?? 0;
+      return Array.from({ length: Math.max(1, m.quantity) }, (_, i) => ({
+        id: nextId(),
+        name: m.quantity > 1 ? `${m.name} ${i + 1}` : m.name,
+        init: rollExpression('1d20')?.total ?? 10,
+        hp,
+        maxHp: hp,
+        armorClass: m.armorClass,
+        isEnemy: true,
+        monsterId: m.monsterId,
+      }));
+    });
+    if (added.length === 0) return;
+    // Sort the fresh batch among itself for a sensible starting order, then
+    // append — existing combatants (PCs the DM already added) keep whatever
+    // order they're already in.
+    added.sort((a, b) => b.init - a.init);
+    setCombatants((prev) => [...prev, ...added]);
+  }, []);
+
+  // Lets the DM correct a rolled (or manually entered) initiative later —
+  // ties, house rules, a misread die, whatever — without reshuffling the
+  // manually-arranged order.
+  const handleEditInit = useCallback((id: string, init: number) => {
+    setCombatants((prev) => prev.map((c) => (c.id === id ? { ...c, init } : c)));
+  }, []);
+
+  // Drag-and-drop reordering: the array order *is* the turn order.
+  const handleReorderCombatants = useCallback((draggedId: string, targetId: string) => {
+    setCombatants((prev) => {
+      const fromIdx = prev.findIndex((c) => c.id === draggedId);
+      const toIdx = prev.findIndex((c) => c.id === targetId);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+  }, []);
+
+  // Fills in AC/HP for a combatant whose encounter snapshot didn't have them
+  // (older encounters, built before AC/HP were captured) — never overwrites
+  // a value that's already set.
+  const handleInheritStats = useCallback((id: string, stats: { armorClass: number | null; maxHp: number }) => {
+    setCombatants((prev) => prev.map((c) => {
+      if (c.id !== id) return c;
+      const armorClass = c.armorClass ?? stats.armorClass;
+      if (c.maxHp > 0 || stats.maxHp <= 0) return { ...c, armorClass };
+      return { ...c, armorClass, maxHp: stats.maxHp, hp: stats.maxHp };
+    }));
+  }, []);
+
+  // Bundled so the tracker can be rendered either from the sidenav flyout or
+  // embedded full-height in the encounter takeover without re-threading a
+  // dozen props in two places.
+  const initiativeState: InitiativeState = {
+    combatants,
+    turn,
+    cName,
+    cInit,
+    cHp,
+    cAc,
+    cEnemy,
+    onNameChange: setCName,
+    onInitChange: setCInit,
+    onHpChange: setCHp,
+    onAcChange: setCAc,
+    onToggleEnemy: () => setCEnemy((v) => !v),
+    onAdd: addCombatant,
+    onRemove: removeCombatant,
+    onApplyHp: applyHp,
+    onEditInit: handleEditInit,
+    onReorder: handleReorderCombatants,
+    onInheritStats: handleInheritStats,
+    onViewMonster: setViewMonsterId,
+    onNextTurn: nextTurn,
+    onReset: resetCombat,
+    dmgRefs,
+  };
 
   const togglePanel = useCallback((p: DmPanel) => setPanel((cur) => (cur === p ? null : p)), []);
 
@@ -384,7 +591,11 @@ export default function SessionTheatre({
         </header>
 
         <div className="theatre__body">
-          <Stage stage={stage} onClear={clearStage} readOnly />
+          {encounterAsset ? (
+            <EncounterTakeover asset={encounterAsset} readOnly />
+          ) : (
+            <Stage stage={stage} onClear={clearStage} readOnly />
+          )}
         </div>
       </div>
     );
@@ -433,6 +644,8 @@ export default function SessionTheatre({
             onExit={onExit}
             notesOpen={notesOpen}
             onToggleNotes={() => setNotesOpen((v) => !v)}
+            initiativeOpen={initiativeOpen}
+            onToggleInitiative={() => setInitiativeOpen((v) => !v)}
             trayOpen={trayOpen}
             onToggleTray={() => setTrayOpen((v) => !v)}
             tab={tab}
@@ -456,27 +669,6 @@ export default function SessionTheatre({
                 />
               )}
 
-              {panel === 'initiative' && (
-                <InitiativePanel
-                  combatants={combatants}
-                  turn={turn}
-                  cName={cName}
-                  cInit={cInit}
-                  cHp={cHp}
-                  cEnemy={cEnemy}
-                  onNameChange={setCName}
-                  onInitChange={setCInit}
-                  onHpChange={setCHp}
-                  onToggleEnemy={() => setCEnemy((v) => !v)}
-                  onAdd={addCombatant}
-                  onRemove={removeCombatant}
-                  onApplyHp={applyHp}
-                  onNextTurn={nextTurn}
-                  onReset={resetCombat}
-                  dmgRefs={dmgRefs}
-                />
-              )}
-
               {panel === 'scratch' && (
                 <ScratchPanel value={scratch} onChange={setScratch} />
               )}
@@ -484,46 +676,85 @@ export default function SessionTheatre({
           )}
         </div>
 
-        {notesOpen && (
-          <aside className="theatre__notes" aria-label="Session notes">
-            {notesBody}
-          </aside>
-        )}
-        {notesOpen && (
-          <ResizeHandle
-            label="Resize notes panel"
-            onPointerDown={startResize('notes')}
-            onKeyDown={(e) => onHandleKey('notes', e)}
-            onReset={() => setNotesW(PANE_DEFAULT)}
+        {encounterAsset && !encounterMinimized ? (
+          <EncounterTakeover
+            asset={encounterAsset}
+            onMinimize={() => setEncounterMinimized(true)}
+            onEnd={() => { removeFromStage(encounterAsset.instanceId); setEncounterMinimized(false); }}
+            onRollInitiative={handleRollInitiative}
+            onViewMonster={setViewMonsterId}
+            initiative={initiativeState}
           />
-        )}
+        ) : (
+          <>
+            {encounterAsset && encounterMinimized && (
+              <button
+                type="button"
+                className="theatre__encounter-restore"
+                onClick={() => setEncounterMinimized(false)}
+              >
+                ⚔ {encounterAsset.title} — restore
+              </button>
+            )}
 
-        <Stage
-          stage={stage}
-          onClear={clearStage}
-          onDropAsset={addToStage}
-          onRemoveAsset={removeFromStage}
-          onMoveAsset={moveAsset}
-        />
+            {initiativeOpen && (
+              <aside className="theatre__initiative-col" aria-label="Initiative tracker">
+                <InitiativePanel {...initiativeState} />
+              </aside>
+            )}
+            {initiativeOpen && (
+              <ResizeHandle
+                label="Resize initiative panel"
+                onPointerDown={startResize('initiative')}
+                onKeyDown={(e) => onHandleKey('initiative', e)}
+                onReset={() => setInitiativeW(PANE_DEFAULT)}
+              />
+            )}
 
-        {trayOpen && (
-          <ResizeHandle
-            label="Resize tray panel"
-            onPointerDown={startResize('tray')}
-            onKeyDown={(e) => onHandleKey('tray', e)}
-            onReset={() => setTrayW(PANE_DEFAULT)}
-          />
-        )}
-        {trayOpen && (
-          <Tray
-            tab={tab}
-            items={trayItems}
-            stagedIds={stagedIds}
-            onReveal={addToStage}
-            onCreateItem={handleCreateItem}
-          />
+            {notesOpen && (
+              <aside className="theatre__notes" aria-label="Session notes">
+                {notesBody}
+              </aside>
+            )}
+            {notesOpen && (
+              <ResizeHandle
+                label="Resize notes panel"
+                onPointerDown={startResize('notes')}
+                onKeyDown={(e) => onHandleKey('notes', e)}
+                onReset={() => setNotesW(PANE_DEFAULT)}
+              />
+            )}
+
+            <Stage
+              stage={stage}
+              onClear={clearStage}
+              onDropAsset={addToStage}
+              onRemoveAsset={removeFromStage}
+              onMoveAsset={moveAsset}
+            />
+
+            {trayOpen && (
+              <ResizeHandle
+                label="Resize tray panel"
+                onPointerDown={startResize('tray')}
+                onKeyDown={(e) => onHandleKey('tray', e)}
+                onReset={() => setTrayW(PANE_DEFAULT)}
+              />
+            )}
+            {trayOpen && (
+              <Tray
+                tab={tab}
+                items={trayItems}
+                stagedIds={stagedIds}
+                onReveal={addToStage}
+                onCreateItem={tab === 'encounter' ? undefined : handleCreateItem}
+              />
+            )}
+          </>
         )}
       </div>
+
+      <MonsterDetailSlideOver monsterId={viewMonsterId} onClose={() => setViewMonsterId(null)} />
     </div>
   );
 }
