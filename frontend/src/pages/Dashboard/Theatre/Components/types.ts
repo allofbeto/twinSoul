@@ -79,6 +79,31 @@ export interface Combatant {
   /** Bestiary monster id, when added from an encounter — lets the DM view
    * its stat block from the initiative list. */
   monsterId?: string | null;
+  /** Whether players are allowed to see this combatant's real name. Only
+   * meaningful for enemies — allies are always shown as themselves. The
+   * server enforces this: an unrevealed enemy's name never reaches a
+   * player's connection, redacted or not client-side. */
+  revealed?: boolean;
+  /** Set when this row is a player's own PC (added via the join-initiative
+   * flow) — lets the tracker dedupe against repeat join requests. */
+  characterId?: string | null;
+}
+
+/** What a player's join-initiative request resolves to, looked up
+ * server-side from the character record so it can't be spoofed. */
+export interface CharacterAddPayload {
+  characterId: string;
+  name: string;
+  hp: number;
+  maxHp: number;
+  armorClass: number | null;
+}
+
+/** One of the current player's own characters in this campaign. */
+export interface MyCharacter {
+  id: string;
+  name: string;
+  user_id: string;
 }
 
 export interface Session {
@@ -167,6 +192,8 @@ export interface InitiativeState {
    * snapshotting existed). Only fills gaps — never overwrites a value the DM
    * already set. */
   onInheritStats: (id: string, stats: { armorClass: number | null; maxHp: number }) => void;
+  /** Flips whether players can see this combatant's real name. */
+  onToggleReveal: (id: string) => void;
   onViewMonster?: (monsterId: string) => void;
   onNextTurn: () => void;
   onReset: () => void;

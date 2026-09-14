@@ -8,7 +8,7 @@ import type {
 import { useAuth } from '../../../context/AuthContext';
 import {
   getCampaigns, createCampaign, getSessions, createSession, getCampaignItems, createCampaignItem, updateSession,
-  getEncounters,
+  getEncounters, getCampaignCharacters,
 } from '../../../api/backendHelpers'; // ← adjust path
 import '../../../styles/SessionTheatre.css';
 import '../../../styles/theatreGate.css';
@@ -19,6 +19,7 @@ import type {
   Combatant,
   DmPanel,
   InitiativeState,
+  MyCharacter,
   NewItemInput,
   RevealAsset,
   RollResult,
@@ -41,8 +42,11 @@ import DicePanel from './Components/DicePanel';
 import InitiativePanel from './Components/InitiativePanel';
 import ScratchPanel from './Components/ScratchPanel';
 import EncounterTakeover from './Components/EncounterTakeover';
+import PlayerInitiativeList from './Components/PlayerInitiativeList';
+import PlayerCharacterJoin from './Components/PlayerCharacterJoin';
 import TheatreNotesEditor from './Components/TheatreNotesEditor';
 import MonsterDetailSlideOver from '../Monsters/Components/MonsterDetailSlideOver';
+import CharacterDetail from '../Characters/CharacterDetail';
 
 let idSeed = 0;
 const nextId = () => `c${(idSeed += 1)}`;
@@ -165,6 +169,21 @@ export default function SessionTheatre({
     [campaignEncounters, activeSession]
   );
 
+  // A player's own characters in this campaign — used both to offer joining
+  // initiative and to know when it's actually their turn.
+  const [myCharacters, setMyCharacters] = useState<MyCharacter[]>([]);
+  useEffect(() => {
+    if (!selected || selected.role !== 'player' || !user) { setMyCharacters([]); return; }
+    let alive = true;
+    getCampaignCharacters(selected.id)
+      .then((res) => {
+        if (!alive) return;
+        setMyCharacters(res.data.filter((c: MyCharacter) => c.user_id === user.id));
+      })
+      .catch(() => { if (alive) setMyCharacters([]); });
+    return () => { alive = false; };
+  }, [selected, user]);
+
   useEffect(() => {
     if (activeCampaign) return;
     let alive = true;
@@ -277,7 +296,11 @@ export default function SessionTheatre({
   } as unknown as CSSProperties;
 
   // Stage is shared over ActionCable: the DM drives it, players receive it live.
-  const { stage, addToStage, removeFromStage, moveAsset, clearStage } = useTable({
+  const {
+    stage, addToStage, removeFromStage, moveAsset, clearStage,
+    sharedCombatants, sharedTurn, broadcastInitiative,
+    characterAddRequest, requestAddCharacter,
+  } = useTable({
     campaignId: selected?.id ?? null,
     role: selected?.role,
     token,
@@ -294,6 +317,20 @@ export default function SessionTheatre({
   }, [encounterAsset?.instanceId]);
 
   const [viewMonsterId, setViewMonsterId] = useState<string | null>(null);
+
+  // Player's main-space tab: the table (stage/encounter) or their own sheet.
+  // Whichever of their characters is acting right now — if any — gets shown
+  // automatically when the turn reaches them; they can flip back to the
+  // table at any time and it won't force them back until the NEXT time it
+  // becomes their turn.
+  const [mainTab, setMainTab] = useState<'table' | 'sheet'>('table');
+  const myCharacterIds = useMemo(() => new Set(myCharacters.map((c) => c.id)), [myCharacters]);
+  const activeCombatant = sharedCombatants[sharedTurn];
+  const isMyTurn = !!activeCombatant?.characterId && myCharacterIds.has(activeCombatant.characterId);
+  const sheetCharacterId = (isMyTurn ? activeCombatant?.characterId : null) ?? myCharacters[0]?.id ?? null;
+  useEffect(() => {
+    if (isMyTurn) setMainTab('sheet');
+  }, [isMyTurn]);
 
   const [tab, setTab] = useState<AssetKind>('art');
   const [notesOpen, setNotesOpen] = useState(true);
@@ -394,7 +431,7 @@ export default function SessionTheatre({
     const safeAc = Number.isNaN(ac) ? null : ac;
     setCombatants((prev) => [
       ...prev,
-      { id: nextId(), name, init, hp: safeHp, maxHp: safeHp, armorClass: safeAc, isEnemy: cEnemy },
+      { id: nextId(), name, init, hp: safeHp, maxHp: safeHp, armorClass: safeAc, isEnemy: cEnemy, revealed: !cEnemy },
     ]);
     setCName(''); setCInit(''); setCHp(''); setCAc('');
   }, [cName, cInit, cHp, cAc, cEnemy]);
@@ -432,6 +469,7 @@ export default function SessionTheatre({
         maxHp: hp,
         armorClass: m.armorClass,
         isEnemy: true,
+        revealed: false,
         monsterId: m.monsterId,
       }));
     });
@@ -475,6 +513,39 @@ export default function SessionTheatre({
     }));
   }, []);
 
+  const handleToggleReveal = useCallback((id: string) => {
+    setCombatants((prev) => prev.map((c) => (c.id === id ? { ...c, revealed: !c.revealed } : c)));
+  }, []);
+
+  // Keep players' (redacted) initiative view in sync with the DM's tracker.
+  // Debounced so a burst of edits (drag-reorder, HP ticks) doesn't spam the
+  // socket — the server does the actual redaction on every send.
+  useEffect(() => {
+    if (selected?.role !== 'owner') return;
+    const t = setTimeout(() => broadcastInitiative(combatants, turn), 300);
+    return () => clearTimeout(t);
+  }, [combatants, turn, selected?.role, broadcastInitiative]);
+
+  // A player asked to join their own PC in — insert it (once; ignore repeat
+  // requests for a character already tracked) as an always-visible ally.
+  useEffect(() => {
+    if (!characterAddRequest || selected?.role !== 'owner') return;
+    setCombatants((prev) => {
+      if (prev.some((c) => c.characterId === characterAddRequest.characterId)) return prev;
+      return [...prev, {
+        id: nextId(),
+        name: characterAddRequest.name,
+        init: rollExpression('1d20')?.total ?? 10,
+        hp: characterAddRequest.hp,
+        maxHp: characterAddRequest.maxHp,
+        armorClass: characterAddRequest.armorClass,
+        isEnemy: false,
+        revealed: true,
+        characterId: characterAddRequest.characterId,
+      }];
+    });
+  }, [characterAddRequest, selected?.role]);
+
   // Bundled so the tracker can be rendered either from the sidenav flyout or
   // embedded full-height in the encounter takeover without re-threading a
   // dozen props in two places.
@@ -497,6 +568,7 @@ export default function SessionTheatre({
     onEditInit: handleEditInit,
     onReorder: handleReorderCombatants,
     onInheritStats: handleInheritStats,
+    onToggleReveal: handleToggleReveal,
     onViewMonster: setViewMonsterId,
     onNextTurn: nextTurn,
     onReset: resetCombat,
@@ -591,11 +663,55 @@ export default function SessionTheatre({
         </header>
 
         <div className="theatre__body">
-          {encounterAsset ? (
-            <EncounterTakeover asset={encounterAsset} readOnly />
-          ) : (
-            <Stage stage={stage} onClear={clearStage} readOnly />
-          )}
+          {/* Always the leftmost column for players — stays put whether or
+             not an encounter is currently taking over the rest of the view. */}
+          <aside className="theatre__initiative-col" aria-label="Initiative">
+            {user && (
+              <PlayerCharacterJoin
+                myCharacters={myCharacters}
+                sharedCombatants={sharedCombatants}
+                onRequestAdd={requestAddCharacter}
+              />
+            )}
+            <PlayerInitiativeList combatants={sharedCombatants} turn={sharedTurn} />
+          </aside>
+
+          <div className="theatre__player-main">
+            {myCharacters.length > 0 && (
+              <div className="theatre__player-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={mainTab === 'table'}
+                  className={`theatre__player-tab ${mainTab === 'table' ? 'is-active' : ''}`}
+                  onClick={() => setMainTab('table')}
+                >
+                  Table
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={mainTab === 'sheet'}
+                  className={`theatre__player-tab ${mainTab === 'sheet' ? 'is-active' : ''} ${isMyTurn ? 'is-my-turn' : ''}`}
+                  onClick={() => setMainTab('sheet')}
+                >
+                  My Character{isMyTurn ? ' — Your Turn!' : ''}
+                </button>
+              </div>
+            )}
+
+            <div className="theatre__player-main-content">
+              {mainTab === 'sheet' && sheetCharacterId ? (
+                <div className="theatre__player-sheet">
+                  <CharacterDetail characterId={sheetCharacterId} />
+                </div>
+              ) : encounterAsset ? (
+                <EncounterTakeover asset={encounterAsset} readOnly />
+              ) : (
+                <Stage stage={stage} onClear={clearStage} readOnly />
+              )}
+            </div>
+          </div>
         </div>
       </div>
     );

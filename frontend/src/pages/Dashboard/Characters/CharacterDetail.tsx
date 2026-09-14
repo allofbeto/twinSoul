@@ -12,6 +12,7 @@ import AbilityScores from './Components/AbilityScores';
 import CharacterArtBox from './Components/CharacterArtBox';
 import CharacterSidebar from './Components/CharacterSidebar';
 import TabbedPanel from './Components/TabbedPanel';
+import LevelUpWizard from './Components/LevelUpWizard';
 import MigrateInventory from '../../Items/MigrateItems';
 
 interface Character {
@@ -24,6 +25,8 @@ interface Character {
   max_hp: number;
   current_hp: number;
   armor_class: number;
+  temp_hp: number;
+  temp_ac_bonus: number;
   game: string;
   strength: number;
   dexterity: number;
@@ -39,8 +42,15 @@ interface Character {
   campaign?: { id: string; name: string };
 }
 
-const CharacterDetail = () => {
-  const { id } = useParams();
+interface CharacterDetailProps {
+  /** Overrides the route param — lets this be embedded outside its usual
+   * /characters/:id route (e.g. inline in the Theatre for a player). */
+  characterId?: string;
+}
+
+const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
+  const params = useParams();
+  const id = characterId ?? params.id;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -103,6 +113,8 @@ const CharacterDetail = () => {
       max_hp: data.max_hp,
       current_hp: data.current_hp,
       armor_class: data.armor_class,
+      temp_hp: data.temp_hp,
+      temp_ac_bonus: data.temp_ac_bonus,
       game: data.game,
       strength: data.strength,
       dexterity: data.dexterity,
@@ -162,6 +174,23 @@ const CharacterDetail = () => {
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form!, [e.target.name]: parseInt(e.target.value) || 0 });
     setIsDirty(true);
+  };
+
+  const [showLevelUp, setShowLevelUp] = useState(false);
+
+  const handleLevelUpComplete = (result: { hpGained: number; abilityChanges: Partial<Record<string, number>> }) => {
+    const updated: Character = {
+      ...form!,
+      level: Math.min(20, form!.level + 1),
+      max_hp: form!.max_hp + result.hpGained,
+      current_hp: form!.current_hp + result.hpGained,
+    };
+    Object.entries(result.abilityChanges).forEach(([key, delta]) => {
+      (updated as any)[key] = Math.min(20, (updated as any)[key] + (delta || 0));
+    });
+    setForm(updated);
+    setIsDirty(true);
+    setShowLevelUp(false);
   };
 
   const addClass = (cls: string) => {
@@ -247,10 +276,14 @@ const CharacterDetail = () => {
           <CharacterArtBox
             imageUrl={imageUrl}
             level={form.level}
+            max_hp={form.max_hp}
             current_hp={form.current_hp}
             armor_class={form.armor_class}
+            temp_hp={form.temp_hp}
+            temp_ac_bonus={form.temp_ac_bonus}
             handleNumberChange={handleNumberChange}
             onImageUrlChange={handleImageUrlChange}
+            onRequestLevelUp={() => setShowLevelUp(true)}
             isOwner={isOwner}
           />
           <CharacterSidebar
@@ -292,6 +325,21 @@ const CharacterDetail = () => {
           />
         </div>
       </form>
+
+      <LevelUpWizard
+        isOpen={showLevelUp}
+        currentLevel={form.level}
+        abilityScores={{
+          strength: form.strength,
+          dexterity: form.dexterity,
+          constitution: form.constitution,
+          intelligence: form.intelligence,
+          wisdom: form.wisdom,
+          charisma: form.charisma,
+        }}
+        onCancel={() => setShowLevelUp(false)}
+        onComplete={handleLevelUpComplete}
+      />
 
       <Modal isOpen={showModal} toggle={toggleModal}>
         <ModalHeader toggle={toggleModal}>

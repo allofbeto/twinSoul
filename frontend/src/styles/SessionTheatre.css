@@ -123,7 +123,31 @@
   .theatre__notes { width: var(--notes-w, 300px); }
   .theatre__tray { width: var(--tray-w, 300px); }
   .theatre__initiative-col { width: var(--initiative-w, 300px); padding: 12px; }
-  
+
+  /* Player's main space: Table (stage/encounter) vs their own sheet. */
+  .theatre__player-main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .theatre__player-tabs { display: flex; gap: 8px; margin-bottom: 10px; flex: 0 0 auto; }
+  .theatre__player-tab {
+    appearance: none; cursor: pointer; font: inherit; font-size: 0.85rem;
+    background: var(--panel); color: var(--ink-dim);
+    border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 16px;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .theatre__player-tab:hover { color: var(--ink); }
+  .theatre__player-tab.is-active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+  .theatre__player-tab.is-my-turn:not(.is-active) { border-color: var(--accent); color: var(--accent); animation: pulse-turn 1.4s ease-in-out infinite; }
+  @keyframes pulse-turn { 50% { opacity: 0.55; } }
+  .theatre__player-main-content { flex: 1 1 auto; min-height: 0; display: flex; }
+  .theatre__player-main-content > .theatre__stage,
+  .theatre__player-main-content > .theatre__encounter-takeover { flex: 1 1 auto; }
+  /* The character sheet uses the Dashboard's own light theme, not the
+     Theatre's skin — intentional, it's the same sheet as everywhere else. */
+  .theatre__player-sheet {
+    flex: 1 1 auto; min-width: 0; overflow-y: auto;
+    background: var(--color-background, #fff); border-radius: var(--radius);
+    padding: 20px;
+  }
+
   .theatre__handle {
     flex: 0 0 10px; align-self: stretch; cursor: col-resize;
     position: relative; background: transparent; border: none; padding: 0;
@@ -415,8 +439,14 @@
     font-family: var(--font-display); font-size: 0.95rem; color: var(--accent);
     width: 36px; text-align: center; padding: 2px 0; flex: 0 0 auto;
   }
+  .theatre__init-badge {
+    font-family: var(--font-display); font-size: 0.95rem; color: var(--accent);
+    min-width: 30px; text-align: center; flex: 0 0 auto;
+  }
   .theatre__combatant-name { flex: 1; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .theatre__hp { display: flex; align-items: center; gap: 6px; }
+  .theatre__initiative-join { display: block; margin-bottom: 12px; }
+  .theatre__initiative-join--multi { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
   .theatre__hp-track { width: 70px; height: 6px; border-radius: 999px; background: var(--bg); overflow: hidden; }
   .theatre__hp-fill { display: block; height: 100%; background: var(--heal); transition: width 0.2s; }
   .theatre__hp-num { font-family: var(--font-data); font-size: 0.72rem; color: var(--ink-dim); min-width: 44px; }
@@ -430,6 +460,7 @@
   .theatre__mini:hover { color: var(--ink); border-color: var(--ink-dim); }
   .theatre__mini--dmg:hover { color: var(--enemy); border-color: var(--enemy); }
   .theatre__mini--heal:hover { color: var(--heal); border-color: var(--heal); }
+  .theatre__mini.is-revealed { color: var(--heal); border-color: var(--heal); }
   
   /* Scratch */
   .theatre__scratch {

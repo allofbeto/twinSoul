@@ -20,7 +20,7 @@ export default function CombatTracker({ initiative }: CombatTrackerProps) {
   const {
     combatants, turn, cName, cInit, cHp, cAc, cEnemy,
     onNameChange, onInitChange, onHpChange, onAcChange, onToggleEnemy,
-    onAdd, onRemove, onApplyHp, onEditInit, onReorder, onInheritStats,
+    onAdd, onRemove, onApplyHp, onEditInit, onReorder, onInheritStats, onToggleReveal,
     onNextTurn, onReset, dmgRefs,
   } = initiative;
 
@@ -148,6 +148,17 @@ export default function CombatTracker({ initiative }: CombatTrackerProps) {
                 title="Edit initiative"
               />
               <span className="theatre__combatant-name" title={c.name}>{truncateName(c.name)}</span>
+              {c.isEnemy && (
+                <button
+                  type="button"
+                  className={`theatre__mini ${c.revealed ? 'is-revealed' : ''}`}
+                  onClick={(e) => { e.stopPropagation(); onToggleReveal(c.id); }}
+                  aria-label={c.revealed ? `Hide ${c.name} from players` : `Reveal ${c.name} to players`}
+                  title={c.revealed ? 'Visible to players — click to hide' : 'Hidden from players — click to reveal'}
+                >
+                  <i className={`bx ${c.revealed ? 'bx-lock-open-alt' : 'bx-lock-alt'}`} aria-hidden="true" />
+                </button>
+              )}
               {c.armorClass != null && <span className="theatre__ac-badge">AC {c.armorClass}</span>}
               {c.maxHp > 0 && (
                 <span className="theatre__hp">
@@ -176,6 +187,16 @@ export default function CombatTracker({ initiative }: CombatTrackerProps) {
             <>
               <div className="theatre__combat-detail-head">
                 <h2 className="theatre__combat-detail-name">{selected.name}</h2>
+                {selected.isEnemy && (
+                  <button
+                    type="button"
+                    className={`theatre__chip ${selected.revealed ? '' : 'is-enemy'}`}
+                    onClick={() => onToggleReveal(selected.id)}
+                  >
+                    <i className={`bx ${selected.revealed ? 'bx-lock-open-alt' : 'bx-lock-alt'}`} aria-hidden="true" />{' '}
+                    {selected.revealed ? 'Visible to players' : 'Hidden from players'}
+                  </button>
+                )}
                 <div className="theatre__combat-detail-stats">
                   {selected.armorClass != null && <span className="theatre__ac-badge">AC {selected.armorClass}</span>}
                   {selected.maxHp > 0 && (

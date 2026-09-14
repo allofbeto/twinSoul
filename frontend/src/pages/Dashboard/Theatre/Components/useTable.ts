@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 // No official types for this package — declare it in a .d.ts (see note below).
 import { createConsumer } from '@rails/actioncable';
-import type { RevealAsset, StagedAsset } from './types';
+import type { CharacterAddPayload, Combatant, RevealAsset, StagedAsset } from './types';
 
 // Point this at your Rails cable endpoint. In dev that's the API host;
 // in prod, wherever ActionCable is mounted.
@@ -29,12 +29,30 @@ interface UseTable {
   removeFromStage: (instanceId: string) => void;
   moveAsset: (instanceId: string, x: number, y: number) => void;
   clearStage: () => void;
+  /** Read-only, already-redacted initiative order — the server strips an
+   * unrevealed enemy's name before it ever reaches this connection, so
+   * there's nothing to hide client-side. Only meaningful for players; the
+   * DM drives their own tracker locally and doesn't consume this. */
+  sharedCombatants: Combatant[];
+  sharedTurn: number;
+  broadcastInitiative: (combatants: Combatant[], turn: number) => void;
+  /** The latest "add my character" request from any player — the DM's
+   * screen watches this and inserts it into the local tracker; everyone
+   * else just ignores it (they have no local tracker to insert into). */
+  characterAddRequest: CharacterAddPayload | null;
+  /** Any campaign member can call this for their own character — the
+   * server looks it up by id (scoped to this user + campaign) rather than
+   * trusting whatever stats are passed in. */
+  requestAddCharacter: (characterId: string) => void;
 }
 
 export function useTable({ campaignId, role, token }: UseTableArgs): UseTable {
   const [stage, setStage] = useState<StagedAsset[]>([]);
   const stageRef = useRef<StagedAsset[]>([]);
   stageRef.current = stage;
+  const [sharedCombatants, setSharedCombatants] = useState<Combatant[]>([]);
+  const [sharedTurn, setSharedTurn] = useState(0);
+  const [characterAddRequest, setCharacterAddRequest] = useState<CharacterAddPayload | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subRef = useRef<any>(null);
 
@@ -49,8 +67,20 @@ export function useTable({ campaignId, role, token }: UseTableArgs): UseTable {
     const sub = consumer.subscriptions.create(
       { channel: 'TableChannel', campaign_id: campaignId },
       {
-        received(data: { type: string; assets: StagedAsset[] | null }) {
+        received(data: {
+          type: string;
+          assets?: StagedAsset[];
+          combatants?: Combatant[];
+          turn?: number;
+          character?: CharacterAddPayload;
+        }) {
           if (data.type === 'reveal') setStage(data.assets ?? []);
+          else if (data.type === 'initiative') {
+            setSharedCombatants(data.combatants ?? []);
+            setSharedTurn(data.turn ?? 0);
+          } else if (data.type === 'add_character' && data.character) {
+            setCharacterAddRequest(data.character);
+          }
         },
       },
     );
@@ -86,5 +116,22 @@ export function useTable({ campaignId, role, token }: UseTableArgs): UseTable {
 
   const clearStage = useCallback(() => broadcast([]), [broadcast]);
 
-  return { stage, addToStage, removeFromStage, moveAsset, clearStage };
+  // The DM's tracker is authoritative on their own screen — this just tells
+  // the server what to (redact and) forward to players. No local/optimistic
+  // update here since the DM never reads sharedCombatants back.
+  const broadcastInitiative = useCallback((combatants: Combatant[], turn: number) => {
+    if (role !== 'owner') return;
+    subRef.current?.perform('set_initiative', { combatants, turn });
+  }, [role]);
+
+  // Any member (not owner-gated) — a player joining their own PC into the fight.
+  const requestAddCharacter = useCallback((characterId: string) => {
+    subRef.current?.perform('add_character', { character_id: characterId });
+  }, []);
+
+  return {
+    stage, addToStage, removeFromStage, moveAsset, clearStage,
+    sharedCombatants, sharedTurn, broadcastInitiative,
+    characterAddRequest, requestAddCharacter,
+  };
 }

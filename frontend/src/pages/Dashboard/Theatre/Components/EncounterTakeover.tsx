@@ -9,7 +9,10 @@ interface EncounterTakeoverProps {
   onRollInitiative?: (asset: StagedAsset) => void;
   onViewMonster?: (monsterId: string) => void;
   /** DM-only: the live initiative tracker, embedded full-height below the
-   * encounter summary instead of tucked away in the sidenav flyout. */
+   * encounter summary instead of tucked away in the sidenav flyout. Players
+   * get the initiative order from the persistent left column instead (see
+   * SessionTheatre), not from inside this card, so it stays put regardless
+   * of whether an encounter is up. */
   initiative?: InitiativeState;
 }
 
@@ -37,7 +40,8 @@ export default function EncounterTakeover({
           <div className="theatre__encounter-takeover-head-row">
             <div className="theatre__encounter-takeover-heading">
               <h1 className="theatre__encounter-takeover-title">{asset.title}</h1>
-              {asset.subtitle && (
+              {/* Subtitle carries DM notes (escalation triggers, etc.) — DM-only. */}
+              {!readOnly && asset.subtitle && (
                 <p className="theatre__encounter-takeover-sub">{asset.subtitle}</p>
               )}
             </div>
@@ -58,12 +62,14 @@ export default function EncounterTakeover({
             )}
           </div>
 
-          {combatants.length > 0 && (
+          {/* The monster list is DM-only — players learn who's here from the
+             initiative order instead, redacted until revealed. */}
+          {!readOnly && combatants.length > 0 && (
             <div className="theatre__encounter-takeover-tags">
               {combatants.map((m, i) => (
                 <span className="theatre__tag theatre__encounter-monster-tag" key={`${m.name}-${i}`}>
                   {m.quantity > 1 ? `${m.name} ×${m.quantity}` : m.name}
-                  {!readOnly && onViewMonster && m.monsterId && (
+                  {onViewMonster && m.monsterId && (
                     <button
                       type="button"
                       className="theatre__encounter-monster-view"

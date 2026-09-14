@@ -3,14 +3,21 @@ import React, { useState } from 'react';
 interface Props {
   imageUrl?: string;
   level: number;
+  max_hp: number;
   current_hp: number;
   armor_class: number;
+  temp_hp: number;
+  temp_ac_bonus: number;
   handleNumberChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onImageUrlChange: (url: string) => void;
+  onRequestLevelUp: () => void;
   isOwner: boolean;
 }
 
-const CharacterArtBox = ({ imageUrl, level, current_hp, armor_class, handleNumberChange, onImageUrlChange, isOwner }: Props) => {
+const CharacterArtBox = ({
+  imageUrl, level, max_hp, current_hp, armor_class, temp_hp, temp_ac_bonus,
+  handleNumberChange, onImageUrlChange, onRequestLevelUp, isOwner,
+}: Props) => {
   const [editing, setEditing] = useState(false);
   const [urlInput, setUrlInput] = useState(imageUrl || '');
 
@@ -81,6 +88,7 @@ const CharacterArtBox = ({ imageUrl, level, current_hp, armor_class, handleNumbe
             min={0}
             disabled={!isOwner}
           />
+          <span className="stat-hint">/ {max_hp}{temp_hp > 0 ? ` +${temp_hp}` : ''}</span>
         </div>
         <div className="character-stat">
           <span className="stat-label">AC</span>
@@ -93,7 +101,49 @@ const CharacterArtBox = ({ imageUrl, level, current_hp, armor_class, handleNumbe
             min={0}
             disabled={!isOwner}
           />
+          {temp_ac_bonus !== 0 && (
+            <span className="stat-hint">{temp_ac_bonus > 0 ? '+' : ''}{temp_ac_bonus} = {armor_class + temp_ac_bonus}</span>
+          )}
         </div>
+      </div>
+
+      {/* Session-scoped, not permanent: cleared manually when the effect ends. */}
+      <div className="character-stat-strip character-stat-strip--temp">
+        <div className="character-stat">
+          <span className="stat-label">Temp HP</span>
+          <input
+            type="number"
+            name="temp_hp"
+            className="stat-input"
+            value={temp_hp}
+            onChange={handleNumberChange}
+            min={0}
+            disabled={!isOwner}
+          />
+        </div>
+        <div className="character-stat">
+          <span className="stat-label">Temp AC</span>
+          <input
+            type="number"
+            name="temp_ac_bonus"
+            className="stat-input"
+            value={temp_ac_bonus}
+            onChange={handleNumberChange}
+            disabled={!isOwner}
+          />
+        </div>
+        {isOwner && (
+          <div className="character-stat character-stat--action">
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm"
+              onClick={onRequestLevelUp}
+              disabled={level >= 20}
+            >
+              Level Up
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

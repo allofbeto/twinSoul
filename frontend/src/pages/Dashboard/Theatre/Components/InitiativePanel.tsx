@@ -20,6 +20,7 @@ export default function InitiativePanel({
   onApplyHp,
   onEditInit,
   onReorder,
+  onToggleReveal,
   onViewMonster,
   onNextTurn,
   onReset,
@@ -98,6 +99,17 @@ export default function InitiativePanel({
               title="Edit initiative"
             />
             <span className="theatre__combatant-name">{c.name}</span>
+            {c.isEnemy && (
+              <button
+                type="button"
+                className={`theatre__mini ${c.revealed ? 'is-revealed' : ''}`}
+                onClick={() => onToggleReveal(c.id)}
+                aria-label={c.revealed ? `Hide ${c.name} from players` : `Reveal ${c.name} to players`}
+                title={c.revealed ? 'Visible to players — click to hide' : 'Hidden from players — click to reveal'}
+              >
+                <i className={`bx ${c.revealed ? 'bx-lock-open-alt' : 'bx-lock-alt'}`} aria-hidden="true" />
+              </button>
+            )}
             {c.armorClass != null && (
               <span className="theatre__ac-badge" title="Armor Class">AC {c.armorClass}</span>
             )}

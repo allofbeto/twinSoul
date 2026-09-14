@@ -103,7 +103,7 @@ class Api::V1::CharactersController < ApplicationController
     def character_params
       params.permit(
         :name, :race, :level, :max_hp, :current_hp,
-        :armor_class, :game, :strength, :dexterity,
+        :armor_class, :temp_hp, :temp_ac_bonus, :game, :strength, :dexterity,
         :constitution, :intelligence, :wisdom, :charisma,
         :profile_image_id, :campaign_id, :gold, :inspo,
         classes: [], skills: []

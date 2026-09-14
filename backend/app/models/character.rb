@@ -9,5 +9,7 @@ class Character < ApplicationRecord
     validates :race, presence: true
     validates :level, numericality: { greater_than: 0, less_than_or_equal_to: 20 }
     validates :max_hp, :current_hp, :armor_class, numericality: { greater_than_or_equal_to: 0 }
+    validates :temp_hp, numericality: { greater_than_or_equal_to: 0 }
+    validates :temp_ac_bonus, numericality: { only_integer: true }
     validates :game, presence: true
   end

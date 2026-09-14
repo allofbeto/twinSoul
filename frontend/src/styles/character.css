@@ -70,7 +70,27 @@
     font-weight: 700;
     color: var(--color-text);
   }
-  
+
+  .character-stat-strip--temp {
+    border-top: none;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+    margin-top: -1px;
+  }
+
+  .stat-hint {
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+  }
+
+  .character-stat--action {
+    justify-content: center;
+  }
+
+  .character-levelup-form {
+    width: 100%;
+  }
+
   /* Sidebar */
   .character-sidebar {
     height: 100%;

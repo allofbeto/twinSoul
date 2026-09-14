@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_09_12_215423) do
+ActiveRecord::Schema[7.0].define(version: 2026_09_14_022916) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -50,6 +50,8 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_12_215423) do
     t.integer "gold", default: 0
     t.integer "inspo", default: 0
     t.uuid "campaign_id"
+    t.integer "temp_hp", default: 0, null: false
+    t.integer "temp_ac_bonus", default: 0, null: false
     t.index ["campaign_id"], name: "index_characters_on_campaign_id"
     t.index ["profile_image_id"], name: "index_characters_on_profile_image_id"
     t.index ["user_id"], name: "index_characters_on_user_id"
