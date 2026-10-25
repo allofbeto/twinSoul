@@ -135,6 +135,8 @@ export interface RollResult {
   expr: string;
   total: number;
   detail: string;
+  /** Each physical die rolled, in order (absent for flat numbers). */
+  dice?: { sides: number; value: number }[];
 }
 
 export type DmPanel = null | 'dice' | 'scratch';

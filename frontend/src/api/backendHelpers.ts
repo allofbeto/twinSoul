@@ -25,6 +25,20 @@ export const createCharacter = (data: object) => api.post('/characters', data);
 export const updateCharacter = (id: string, data: object) => api.patch(`/characters/${id}`, data);
 export const deleteCharacter = (id: string) => api.delete(`/characters/${id}`);
 
+// Classes (shared SRD rules reference)
+export const getCharClasses = (game: string = 'dnd_5e') => api.get(`/char_classes?game=${game}`);
+export const getCharClass = (index: string, game: string = 'dnd_5e') => api.get(`/char_classes/${index}?game=${game}`);
+
+// Races (shared SRD rules reference)
+export const getCharRaces = (game: string = 'dnd_5e') => api.get(`/char_races?game=${game}`);
+export const getCharRace = (index: string, game: string = 'dnd_5e') => api.get(`/char_races/${index}?game=${game}`);
+
+// Character classes (per-character multiclass entries) & leveling
+export const addCharacterClass = (characterId: string, data: object) => api.post(`/characters/${characterId}/character_classes`, data);
+export const updateCharacterClass = (characterId: string, id: string, data: object) => api.patch(`/characters/${characterId}/character_classes/${id}`, data);
+export const removeCharacterClass = (characterId: string, id: string) => api.delete(`/characters/${characterId}/character_classes/${id}`);
+export const levelUpCharacter = (characterId: string, data: object) => api.post(`/characters/${characterId}/level_up`, data);
+
 // Inventory
 export const getInventory = (characterId: string) => api.get(`/characters/${characterId}/inventory`);
 export const getInventoryItems = (characterId: string) => api.get(`/characters/${characterId}/inventory/items`);
@@ -81,3 +95,9 @@ export const closeUser = () => api.patch('/user/close');
 export const deleteUser = () => api.delete('/user');
 
 export const searchUser = (email: string) => api.get(`/users/search?email=${email}`);
+
+// Soundtrack
+export const getCampaignTracks = (campaignId: string) => api.get(`/campaigns/${campaignId}/tracks`);
+export const createTrack = (campaignId: string, data: object) => api.post(`/campaigns/${campaignId}/tracks`, data);
+export const updateTrack = (id: string, data: object) => api.patch(`/tracks/${id}`, data);
+export const deleteTrack = (id: string) => api.delete(`/tracks/${id}`);

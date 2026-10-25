@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getSessions, updateSession, deleteSession, createCampaignItem } from '../../../api/backendHelpers';
-import SessionEditor from '../../../components/formComponents/editor/SessionEditor';
+import { getSessions, getCampaigns, updateSession, deleteSession, createCampaignItem } from '../../../api/backendHelpers';
+import SessionNotebook from '../../../components/sessionNotebook/SessionNotebook';
 import type { AssetKind } from '../Theatre/Components/types';
+import { TrashIcon } from '../../../components/sessionNotebook/Icons';
 import { Modal, ModalHeader, ModalBody } from 'reactstrap';
 
 interface Session {
@@ -30,6 +31,8 @@ const SessionDetail = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalFunction, setModalFunction] = useState<string | null>(null);
 
+  const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([]);
+
   const formRef = useRef<Session | null>(null);
   formRef.current = form;
 
@@ -50,6 +53,12 @@ const SessionDetail = () => {
     };
     fetch();
   }, [id]);
+
+  useEffect(() => {
+    getCampaigns()
+      .then((c) => setCampaigns(c.data.filter((x: any) => x.role !== 'player')))
+      .catch(() => { /* picker just stays empty */ });
+  }, []);
 
   const handleSave = useCallback(async () => {
     const current = formRef.current;
@@ -158,6 +167,16 @@ const SessionDetail = () => {
                   value={form.played_on || ''}
                   onChange={(e) => { setForm({ ...form, played_on: e.target.value }); markDirty(); }}
                 />
+                <select
+                  className="stat-input-inline"
+                  style={{ fontSize: '0.8rem' }}
+                  value={form.campaign_id || ''}
+                  title="Campaign"
+                  onChange={(e) => { setForm({ ...form, campaign_id: e.target.value || null }); markDirty(); }}
+                >
+                  <option value="">Standalone</option>
+                  {campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
               </div>
             </div>
           </div>
@@ -170,10 +189,12 @@ const SessionDetail = () => {
             )}
             <button
               type="button"
-              className="btn btn-danger btn-sm"
+              className="btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-1"
+              title="Delete session"
+              aria-label="Delete session"
               onClick={() => { setModalFunction('delete'); setShowModal(true); }}
             >
-              ×
+              <TrashIcon /> Delete
             </button>
           </div>
         </div>
@@ -181,11 +202,13 @@ const SessionDetail = () => {
 
       {/* Editor */}
       <div className="mt-3">
-        <SessionEditor
-          content={form.notes || ''}
-          onChange={(html) => { setForm({ ...form, notes: html }); markDirty(); }}
+        <SessionNotebook
+          key={`${form.id}-${form.campaign_id ?? 'none'}`}
+          value={form.notes || ''}
+          onChange={(notes) => { setForm((f) => (f ? { ...f, notes } : f)); markDirty(); }}
           campaignId={form.campaign_id || undefined}
           onCreateObject={handleCreateObject}
+          saveLabel={saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : undefined}
         />
       </div>
 

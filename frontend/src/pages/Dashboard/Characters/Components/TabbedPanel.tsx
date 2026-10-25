@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import SkillSelector from './SkillSelector';
 import InventoryTable from './InventoryTable';
+import ClassFeatures from './ClassFeatures';
+import { CharacterClassSummary } from '../classTypes';
 
-type Tab = 'skills' | 'inventory' | 'notes';
+type Tab = 'skills' | 'features' | 'inventory' | 'notes';
 
 interface Props {
   skills: string[];
@@ -17,17 +19,21 @@ interface Props {
   };
   proficiencyBonus: number;
   characterId: string;
+  classSummaries: CharacterClassSummary[];
+  supportsClasses: boolean;
   isOwner: boolean;
 }
 
-const TABS: { key: Tab; label: string }[] = [
+const ALL_TABS: { key: Tab; label: string }[] = [
   { key: 'skills', label: 'Skills' },
+  { key: 'features', label: 'Features' },
   { key: 'inventory', label: 'Inventory' },
   { key: 'notes', label: 'Notes' },
 ];
 
-const TabbedPanel = ({ skills, onToggleSkill, abilityScores, proficiencyBonus, characterId, isOwner }: Props) => {
+const TabbedPanel = ({ skills, onToggleSkill, abilityScores, proficiencyBonus, characterId, classSummaries, supportsClasses, isOwner }: Props) => {
   const [activeTab, setActiveTab] = useState<Tab>('skills');
+  const TABS = ALL_TABS.filter((t) => t.key !== 'features' || supportsClasses);
 
   return (
     <div className="card-theme h-100">
@@ -53,6 +59,9 @@ const TabbedPanel = ({ skills, onToggleSkill, abilityScores, proficiencyBonus, c
             proficiencyBonus={proficiencyBonus}
             isOwner={isOwner}
           />
+        )}
+        {activeTab === 'features' && (
+          <ClassFeatures classSummaries={classSummaries} />
         )}
         {activeTab === 'inventory' && (
           <InventoryTable characterId={characterId} />

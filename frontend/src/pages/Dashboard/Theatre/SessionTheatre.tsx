@@ -44,7 +44,7 @@ import ScratchPanel from './Components/ScratchPanel';
 import EncounterTakeover from './Components/EncounterTakeover';
 import PlayerInitiativeList from './Components/PlayerInitiativeList';
 import PlayerCharacterJoin from './Components/PlayerCharacterJoin';
-import TheatreNotesEditor from './Components/TheatreNotesEditor';
+import SessionNotebook from '../../../components/sessionNotebook/SessionNotebook';
 import MonsterDetailSlideOver from '../Monsters/Components/MonsterDetailSlideOver';
 import CharacterDetail from '../Characters/CharacterDetail';
 
@@ -738,13 +738,18 @@ export default function SessionTheatre({
     notesSaveStatus === 'saving' ? 'Saving…' : notesSaveStatus === 'saved' ? 'Saved' : undefined;
 
   const notesBody: ReactNode = notes ?? (
-    <TheatreNotesEditor
-      key={activeSession.id}
-      content={effectiveNotes ?? ''}
-      onChange={handleNotesChange}
-      saveLabel={notesSaveLabel}
-      onCreateObject={handleCreateItem}
-    />
+    <div className="theatre__notes-scroll theatre__nb-wrap">
+      <SessionNotebook
+        key={activeSession.id}
+        value={effectiveNotes ?? ''}
+        onChange={handleNotesChange}
+        saveLabel={notesSaveLabel}
+        campaignId={selected.id}
+        onCreateObject={handleCreateItem}
+        compact
+        startInRun
+      />
+    </div>
   );
 
   return (

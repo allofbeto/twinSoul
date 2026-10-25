@@ -1,11 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import CampaignSelector from './CampaignSelector';
+import { getGameSystem } from '../gameSystems';
 
 interface Props {
   name: string;
   race: string;
   level: number;
+  game: string;
   isDirty: boolean;
   saving: boolean;
   success: string;
@@ -14,8 +16,9 @@ interface Props {
   onCampaignChange: (id: string | null) => void;
 }
 
-const CharacterTopBar = ({ name, race, level, isDirty, saving, success, error, campaignId, onCampaignChange }: Props) => {
+const CharacterTopBar = ({ name, race, level, game, isDirty, saving, success, error, campaignId, onCampaignChange }: Props) => {
   const navigate = useNavigate();
+  const gameName = getGameSystem(game)?.name || game;
 
   return (
     <div className="sticky-save-bar">
@@ -23,7 +26,7 @@ const CharacterTopBar = ({ name, race, level, isDirty, saving, success, error, c
         <div>
           <h2 className="text-theme mb-2">{name}</h2>
           <div className="d-flex align-items-center gap-3" style={{width: '90vh'}}>
-            <small className="text-muted-theme">{race} — Level {level}</small>
+            <small className="text-muted-theme">{race} — Level {level} · {gameName}</small>
             <CampaignSelector
               campaignId={campaignId}
               onChange={onCampaignChange}

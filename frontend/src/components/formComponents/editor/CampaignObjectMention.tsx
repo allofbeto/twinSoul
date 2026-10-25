@@ -31,6 +31,10 @@ const MENTION_ICON = SLASH_KIND_OPTIONS.reduce((acc, o) => {
   return acc;
 }, {} as Record<AssetKind, string>);
 
+/** Chip icon for any taggable kind, including characters (not an AssetKind). */
+export const kindIcon = (kind?: string | null) =>
+  kind === 'character' ? '👤' : (kind && MENTION_ICON[kind as AssetKind]) || null;
+
 // The node itself: a Mention variant that also carries a `kind`, rendered as
 // an icon + label chip (e.g. "🧙 Goblin Chief") instead of Mention's default "@label".
 export const CampaignObjectMention = Mention.extend({

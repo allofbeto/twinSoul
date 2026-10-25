@@ -5,6 +5,7 @@ import CampaignOverview from './Components/Overview';
 import CampaignPlayers from './Components/CampaignPlayers';
 import CampaignSessions from './Components/CampaignSessions';
 import CampaignItems from './Components/CampaignItems';
+import CampaignSoundtrack from './Components/CampaignSoundtrack';
 
 interface Campaign {
   id: string;
@@ -29,13 +30,14 @@ interface Player {
   user_id: string;
 }
 
-type Tab = 'overview' | 'players' | 'sessions' | 'items';
+type Tab = 'overview' | 'players' | 'sessions' | 'items' | 'soundtrack';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
   { key: 'players', label: 'Players' },
   { key: 'sessions', label: 'Sessions' },
   { key: 'items', label: 'Items' },
+  { key: 'soundtrack', label: 'Soundtrack' },
 ];
 
 const CampaignDetail = () => {
@@ -159,6 +161,9 @@ const CampaignDetail = () => {
       )}
       {activeTab === 'items' && (
         <CampaignItems campaignId={id!} />
+      )}
+      {activeTab === 'soundtrack' && (
+        <CampaignSoundtrack campaignId={id!} />
       )}
     </div>
   );

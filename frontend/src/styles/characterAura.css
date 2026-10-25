@@ -1,0 +1,84 @@
+/* Animated placeholder for a character portrait: layered, blurred glow
+   blobs tinted by a CSS custom property (--aura-hue) that flicker in size
+   and opacity, sitting inside a slowly hue-rotating frame so the color
+   keeps drifting the longer someone lingers on the screen. */
+
+.character-aura {
+  position: relative;
+  border-radius: 50%;
+  overflow: hidden;
+  margin: 0 auto;
+  background: radial-gradient(circle at 50% 60%, hsl(var(--aura-hue) 70% 14%), #050308 72%);
+  border: 2px solid var(--color-border);
+  box-shadow: 0 0 30px hsl(var(--aura-hue) 80% 50% / 0.35), inset 0 0 25px rgba(0, 0, 0, 0.6);
+  animation: aura-hue-drift 26s linear infinite;
+}
+
+.character-aura-blob {
+  position: absolute;
+  width: 68%;
+  height: 68%;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+  filter: blur(13px);
+}
+
+.character-aura-blob.b1 {
+  top: 12%;
+  left: 10%;
+  background: radial-gradient(circle, hsl(var(--aura-hue) 90% 62% / 0.9), transparent 70%);
+  animation: aura-drift-1 6s ease-in-out infinite, aura-flicker 2.3s ease-in-out infinite;
+}
+
+.character-aura-blob.b2 {
+  top: 32%;
+  left: 34%;
+  background: radial-gradient(circle, hsl(calc(var(--aura-hue) + 45) 90% 58% / 0.8), transparent 70%);
+  animation: aura-drift-2 8s ease-in-out infinite, aura-flicker 3.1s ease-in-out infinite reverse;
+}
+
+.character-aura-blob.b3 {
+  top: 18%;
+  left: -4%;
+  background: radial-gradient(circle, hsl(calc(var(--aura-hue) - 55) 90% 58% / 0.7), transparent 70%);
+  animation: aura-drift-3 9.5s ease-in-out infinite, aura-flicker 1.8s ease-in-out infinite;
+}
+
+.character-aura-core {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.55);
+}
+
+@keyframes aura-hue-drift {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+
+@keyframes aura-flicker {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+@keyframes aura-drift-1 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(10px, -8px); }
+}
+
+@keyframes aura-drift-2 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-12px, 10px); }
+}
+
+@keyframes aura-drift-3 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(9px, 12px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .character-aura,
+  .character-aura-blob {
+    animation: none;
+  }
+}

@@ -3,12 +3,6 @@ export const DND_RACES = [
     'Half-Elf', 'Half-Orc', 'Tiefling', 'Dragonborn'
   ];
   
-  export const DND_CLASSES = [
-    'Barbarian', 'Bard', 'Cleric', 'Druid', 'Fighter',
-    'Monk', 'Paladin', 'Ranger', 'Rogue', 'Sorcerer',
-    'Warlock', 'Wizard'
-  ];
-  
   export const ABILITY_SCORES = [
     { key: 'strength', label: 'STR' },
     { key: 'dexterity', label: 'DEX' },

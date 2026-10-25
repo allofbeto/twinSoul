@@ -1,0 +1,115 @@
+/* Layout for the guided, game-style character creator: a left rail of
+   steps (with the choice made so far under each label), the active step's
+   form in the middle, and a live-updating preview on the right. */
+
+.creation-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 260px;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .creation-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.creation-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.creation-rail-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--border-radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  background: transparent;
+  width: 100%;
+}
+
+.creation-rail-step:hover {
+  background: var(--color-surface-raised);
+}
+
+.creation-rail-step.active {
+  background: var(--color-surface-raised);
+  border-color: var(--color-primary);
+}
+
+.creation-rail-step-marker {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  margin-top: 0.1rem;
+}
+
+.creation-rail-step.completed .creation-rail-step-marker {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.creation-rail-step.active .creation-rail-step-marker {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.creation-rail-step-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.creation-rail-step-value {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: 0.1rem;
+}
+
+.creation-preview {
+  position: sticky;
+  top: 1rem;
+}
+
+.creation-preview-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+  margin-top: 1rem;
+}
+
+.creation-preview-stat {
+  text-align: center;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: 0.3rem 0.2rem;
+}
+
+.creation-preview-stat-label {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.05em;
+}
+
+.creation-preview-stat-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+}

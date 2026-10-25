@@ -14,6 +14,7 @@ import CharacterSidebar from './Components/CharacterSidebar';
 import TabbedPanel from './Components/TabbedPanel';
 import LevelUpWizard from './Components/LevelUpWizard';
 import MigrateInventory from '../../Items/MigrateItems';
+import { CharacterClassSummary } from './classTypes';
 
 interface Character {
   id: string;
@@ -21,6 +22,8 @@ interface Character {
   name: string;
   race: string;
   classes: string[];
+  character_class_summaries: CharacterClassSummary[];
+  proficiency_bonus: number;
   level: number;
   max_hp: number;
   current_hp: number;
@@ -122,7 +125,6 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
       intelligence: data.intelligence,
       wisdom: data.wisdom,
       charisma: data.charisma,
-      classes: data.classes,
       skills: data.skills,
       profile_image_id: data.profile_image_id,
       gold: data.gold,
@@ -178,37 +180,14 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
 
   const [showLevelUp, setShowLevelUp] = useState(false);
 
-  const handleLevelUpComplete = (result: { hpGained: number; abilityChanges: Partial<Record<string, number>> }) => {
-    const updated: Character = {
-      ...form!,
-      level: Math.min(20, form!.level + 1),
-      max_hp: form!.max_hp + result.hpGained,
-      current_hp: form!.current_hp + result.hpGained,
-    };
-    Object.entries(result.abilityChanges).forEach(([key, delta]) => {
-      (updated as any)[key] = Math.min(20, (updated as any)[key] + (delta || 0));
-    });
-    setForm(updated);
-    setIsDirty(true);
+  const handleLevelUpComplete = (updatedCharacter: Character) => {
+    setForm({ ...form!, ...updatedCharacter });
     setShowLevelUp(false);
+    setSuccess('Leveled up!');
   };
 
-  const addClass = (cls: string) => {
-    setIsDirty(true);
-    setForm({
-      ...form!,
-      classes: [...form!.classes, cls],
-    });
-  };
-
-  const toggleClass = (cls: string) => {
-    setIsDirty(true);
-    setForm({
-      ...form!,
-      classes: form!.classes.includes(cls)
-        ? form!.classes.filter((c) => c !== cls)
-        : [...form!.classes, cls],
-    });
+  const handleCharacterUpdated = (updatedCharacter: Character) => {
+    setForm({ ...form!, ...updatedCharacter });
   };
 
   const toggleSkill = (skill: string) => {
@@ -257,6 +236,8 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
   if (loading) return <p className="text-muted-theme">Loading...</p>;
   if (!form) return <p className="text-muted-theme">Character not found.</p>;
 
+  const is5e = form.game === 'dnd_5e';
+
   return (
     <div>
       <form onSubmit={handleSubmit}>
@@ -264,6 +245,7 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
           name={form.name}
           race={form.race}
           level={form.level}
+          game={form.game}
           isDirty={isDirty && isOwner}
           saving={saving}
           success={success}
@@ -284,6 +266,7 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
             handleNumberChange={handleNumberChange}
             onImageUrlChange={handleImageUrlChange}
             onRequestLevelUp={() => setShowLevelUp(true)}
+            showLevelUp={is5e}
             isOwner={isOwner}
           />
           <CharacterSidebar
@@ -291,16 +274,18 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
             gold={form.gold}
             inspo={form.inspo}
             race={form.race}
-            classes={form.classes}
+            characterId={form.id}
+            classSummaries={form.character_class_summaries || []}
+            legacyClasses={form.classes || []}
+            supportsClasses={is5e}
+            onCharacterUpdated={handleCharacterUpdated}
             handleNumberChange={handleNumberChange}
             handleChange={handleChange}
-            onToggleClass={toggleClass}
-            onAddClass={addClass}
             setFieldValue={setFieldValue}
             isOwner={isOwner}
           />
         </div>
-  
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', alignItems: 'stretch' }}>
           <AbilityScores
             form={form}
@@ -319,16 +304,20 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
               wisdom: form.wisdom,
               charisma: form.charisma,
             }}
-            proficiencyBonus={Math.ceil(form.level / 4) + 1}
+            proficiencyBonus={form.proficiency_bonus ?? (Math.ceil(form.level / 4) + 1)}
             characterId={form.id}
+            classSummaries={form.character_class_summaries || []}
+            supportsClasses={is5e}
             isOwner={isOwner}
           />
         </div>
       </form>
 
-      <LevelUpWizard
+      {is5e && <LevelUpWizard
         isOpen={showLevelUp}
+        characterId={form.id}
         currentLevel={form.level}
+        classSummaries={form.character_class_summaries || []}
         abilityScores={{
           strength: form.strength,
           dexterity: form.dexterity,
@@ -339,7 +328,7 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
         }}
         onCancel={() => setShowLevelUp(false)}
         onComplete={handleLevelUpComplete}
-      />
+      />}
 
       <Modal isOpen={showModal} toggle={toggleModal}>
         <ModalHeader toggle={toggleModal}>

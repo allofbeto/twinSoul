@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Modal, ModalBody, ModalHeader, ModalFooter } from 'reactstrap';
 import { ABILITY_SCORES } from '../constants';
+import { useCharClasses, findCharClass } from '../useCharClasses';
+import { CharacterClassSummary, getFeaturesGainedAt, requiresSubclassChoiceAt, spellSlotsAt } from '../classTypes';
+import { levelUpCharacter } from '../../../../api/backendHelpers';
 
 type AbilityKey = 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'charisma';
 
@@ -13,42 +16,59 @@ interface AbilityScoresShape {
   charisma: number;
 }
 
-interface LevelUpResult {
-  hpGained: number;
-  abilityChanges: Partial<Record<AbilityKey, number>>;
-}
-
 interface Props {
   isOpen: boolean;
+  characterId: string;
   currentLevel: number;
+  classSummaries: CharacterClassSummary[];
   abilityScores: AbilityScoresShape;
   onCancel: () => void;
-  onComplete: (result: LevelUpResult) => void;
+  onComplete: (updatedCharacter: any) => void;
 }
-
-const HIT_DICE = [6, 8, 10, 12];
-const ASI_LEVELS = [4, 8, 12, 16, 19];
 
 const getModifier = (score: number) => Math.floor((score - 10) / 2);
 
-const LevelUpWizard = ({ isOpen, currentLevel, abilityScores, onCancel, onComplete }: Props) => {
-  const newLevel = Math.min(20, currentLevel + 1);
-  const isAsiLevel = ASI_LEVELS.includes(newLevel);
+const SLOT_LABELS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-  const [step, setStep] = useState<'hp' | 'asi' | 'review'>('hp');
-  const [hitDie, setHitDie] = useState(8);
+const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abilityScores, onCancel, onComplete }: Props) => {
+  const { classes } = useCharClasses();
+
+  type Step = 'choose-class' | 'hp' | 'subclass' | 'asi' | 'review';
+  const [step, setStep] = useState<Step>('choose-class');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const [selectedClassIndex, setSelectedClassIndex] = useState<string | null>(null);
   const [rollMethod, setRollMethod] = useState<'roll' | 'average'>('average');
   const [rolledValue, setRolledValue] = useState<number | null>(null);
+  const [subclassIndex, setSubclassIndex] = useState<string | null>(null);
   const [asiChoice, setAsiChoice] = useState<'none' | 'single' | 'double'>('none');
   const [singleAbility, setSingleAbility] = useState<AbilityKey>('strength');
   const [doubleAbilities, setDoubleAbilities] = useState<AbilityKey[]>([]);
 
+  const takenIndexes = classSummaries.filter((s) => s.char_class_index).map((s) => s.char_class_index as string);
+  const existingSummary = classSummaries.find((s) => s.char_class_index === selectedClassIndex);
+  const selectedClass = findCharClass(classes, selectedClassIndex || undefined);
+  const oldClassLevel = existingSummary?.level || 0;
+  const newClassLevel = oldClassLevel + 1;
+  const newTotalLevel = Math.min(20, currentLevel + 1);
+
+  const hitDie = selectedClass?.hit_die || 8;
   const conMod = getModifier(abilityScores.constitution);
   const averageRoll = Math.floor(hitDie / 2) + 1;
   const baseRoll = rollMethod === 'roll' ? (rolledValue ?? averageRoll) : averageRoll;
   const hpGained = Math.max(1, baseRoll + conMod);
 
   const reroll = () => setRolledValue(Math.floor(Math.random() * hitDie) + 1);
+
+  const needsSubclassChoice = selectedClass
+    ? requiresSubclassChoiceAt(selectedClass, newClassLevel) && !existingSummary?.subclass_index
+    : false;
+  const alreadyChosenSubclass = existingSummary?.subclass_index || null;
+  const effectiveSubclassIndex = subclassIndex || alreadyChosenSubclass;
+
+  const levelData = selectedClass?.levels.find((l) => l.level === newClassLevel);
+  const isAsiLevel = !!levelData && levelData.ability_score_bonuses > 0;
 
   const abilityChanges: Partial<Record<AbilityKey, number>> = useMemo(() => {
     if (asiChoice === 'single') return { [singleAbility]: 2 };
@@ -69,13 +89,15 @@ const LevelUpWizard = ({ isOpen, currentLevel, abilityScores, onCancel, onComple
   };
 
   const reset = () => {
-    setStep('hp');
-    setHitDie(8);
+    setStep('choose-class');
+    setSelectedClassIndex(null);
     setRollMethod('average');
     setRolledValue(null);
+    setSubclassIndex(null);
     setAsiChoice('none');
     setSingleAbility('strength');
     setDoubleAbilities([]);
+    setError('');
   };
 
   const handleCancel = () => {
@@ -83,40 +105,106 @@ const LevelUpWizard = ({ isOpen, currentLevel, abilityScores, onCancel, onComple
     onCancel();
   };
 
-  const handleConfirm = () => {
-    onComplete({ hpGained, abilityChanges });
-    reset();
+  const abilityAfter = (key: AbilityKey) => Math.min(20, abilityScores[key] + (abilityChanges[key] || 0));
+
+  const grantedFeatures = selectedClass ? getFeaturesGainedAt(selectedClass, newClassLevel, effectiveSubclassIndex) : [];
+  const oldSlots = selectedClass ? spellSlotsAt(selectedClass, oldClassLevel) : null;
+  const newSlots = selectedClass ? spellSlotsAt(selectedClass, newClassLevel) : null;
+
+  const selectClass = (index: string) => {
+    setSelectedClassIndex(index);
+    setStep('hp');
   };
 
-  const goNextFromHp = () => setStep(isAsiLevel ? 'asi' : 'review');
+  const goNextFromHp = () => {
+    if (needsSubclassChoice) return setStep('subclass');
+    setStep(isAsiLevel ? 'asi' : 'review');
+  };
 
-  const abilityAfter = (key: AbilityKey) => Math.min(20, abilityScores[key] + (abilityChanges[key] || 0));
+  const goNextFromSubclass = () => setStep(isAsiLevel ? 'asi' : 'review');
+
+  const handleConfirm = async () => {
+    if (!selectedClass) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const res = await levelUpCharacter(characterId, {
+        char_class_index: selectedClass.index,
+        hp_gained: hpGained,
+        subclass_index: subclassIndex || undefined,
+        ability_score_changes: abilityChanges,
+      });
+      onComplete(res.data);
+      reset();
+    } catch (err: any) {
+      setError(err.response?.data?.errors?.join(', ') || 'Could not level up.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const untaken = classes.filter((c) => !takenIndexes.includes(c.index));
+  const takenClasses = classSummaries.filter((s) => s.char_class_index);
 
   return (
     <Modal isOpen={isOpen} toggle={handleCancel}>
       <ModalHeader toggle={handleCancel}>
-        Level Up — {currentLevel} → {newLevel}
+        Level Up — {currentLevel} → {newTotalLevel}
       </ModalHeader>
       <ModalBody>
-        {step === 'hp' && (
-          <div>
-            <h6 className="text-theme mb-3">Hit Points</h6>
-            <p className="text-muted-theme" style={{ fontSize: '0.85rem' }}>
-              Choose the hit die for the class you're leveling in.
-            </p>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-              {HIT_DICE.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  className={`btn btn-sm ${hitDie === d ? 'btn-theme-primary' : 'btn-outline-secondary'}`}
-                  onClick={() => { setHitDie(d); setRolledValue(null); }}
-                >
-                  d{d}
-                </button>
-              ))}
-            </div>
+        {error && <div className="alert alert-danger">{error}</div>}
 
+        {step === 'choose-class' && (
+          <div>
+            <h6 className="text-theme mb-3">Which class gains a level?</h6>
+            {takenClasses.length > 0 && (
+              <div className="d-flex flex-column gap-2 mb-3">
+                {takenClasses.map((s) => {
+                  const cls = findCharClass(classes, s.char_class_index);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className="btn btn-outline-secondary btn-sm text-start"
+                      onClick={() => selectClass(s.char_class_index as string)}
+                    >
+                      {cls?.name || s.char_class_name} — currently level {s.level}
+                      {s.subclass_index && cls ? ` (${cls.subclasses.find((sc) => sc.index === s.subclass_index)?.name})` : ''}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {untaken.length > 0 && (
+              <>
+                <p className="text-muted-theme mb-2" style={{ fontSize: '0.85rem' }}>
+                  {takenClasses.length > 0 ? 'Or multiclass into a new class:' : 'Choose a class:'}
+                </p>
+                <div className="d-flex flex-wrap gap-2">
+                  {untaken.map((c) => (
+                    <button
+                      key={c.index}
+                      type="button"
+                      className="btn btn-outline-secondary btn-sm"
+                      onClick={() => selectClass(c.index)}
+                    >
+                      {c.name} (d{c.hit_die})
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {step === 'hp' && selectedClass && (
+          <div>
+            <h6 className="text-theme mb-3">
+              {selectedClass.name} — Hit Points (Level {oldClassLevel} → {newClassLevel})
+            </h6>
+            <p className="text-muted-theme" style={{ fontSize: '0.85rem' }}>
+              Hit die: d{hitDie}
+            </p>
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
               <button
                 type="button"
@@ -145,11 +233,34 @@ const LevelUpWizard = ({ isOpen, currentLevel, abilityScores, onCancel, onComple
           </div>
         )}
 
+        {step === 'subclass' && selectedClass && (
+          <div>
+            <h6 className="text-theme mb-3">Choose a {selectedClass.name} Subclass</h6>
+            <div className="d-flex flex-column gap-2">
+              {selectedClass.subclasses.map((sc) => (
+                <button
+                  key={sc.index}
+                  type="button"
+                  className={`btn btn-sm text-start ${subclassIndex === sc.index ? 'btn-theme-primary' : 'btn-outline-secondary'}`}
+                  onClick={() => setSubclassIndex(sc.index)}
+                >
+                  <strong>{sc.name}</strong>
+                  {sc.desc[0] && (
+                    <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: '0.15rem' }}>
+                      {sc.desc[0].slice(0, 140)}{sc.desc[0].length > 140 ? '…' : ''}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {step === 'asi' && (
           <div>
             <h6 className="text-theme mb-3">Ability Score Improvement</h6>
             <p className="text-muted-theme" style={{ fontSize: '0.85rem' }}>
-              Level {newLevel} grants an Ability Score Improvement. Choose one:
+              Level {newClassLevel} in {selectedClass?.name} grants an Ability Score Improvement. Choose one:
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
               <button
@@ -218,12 +329,15 @@ const LevelUpWizard = ({ isOpen, currentLevel, abilityScores, onCancel, onComple
           </div>
         )}
 
-        {step === 'review' && (
+        {step === 'review' && selectedClass && (
           <div>
             <h6 className="text-theme mb-3">Review</h6>
             <ul style={{ paddingLeft: '1.1rem', fontSize: '0.9rem' }} className="text-theme">
-              <li>Level {currentLevel} → {newLevel}</li>
+              <li>{selectedClass.name}: {oldClassLevel} → {newClassLevel} (Character level {currentLevel} → {newTotalLevel})</li>
               <li>Max HP +{hpGained}</li>
+              {effectiveSubclassIndex && (
+                <li>Subclass: {selectedClass.subclasses.find((s) => s.index === effectiveSubclassIndex)?.name}</li>
+              )}
               {Object.entries(abilityChanges).map(([key, delta]) => (
                 <li key={key}>
                   {ABILITY_SCORES.find((a) => a.key === key)?.label}: {abilityScores[key as AbilityKey]} → {abilityAfter(key as AbilityKey)}
@@ -233,15 +347,60 @@ const LevelUpWizard = ({ isOpen, currentLevel, abilityScores, onCancel, onComple
                 <li>Ability Score Improvement skipped (feat)</li>
               )}
             </ul>
+
+            {grantedFeatures.length > 0 && (
+              <>
+                <h6 className="text-theme mt-3 mb-2">Features Gained</h6>
+                <div className="d-flex flex-column gap-2">
+                  {grantedFeatures.map((f) => (
+                    <div key={f.index}>
+                      <strong className="text-theme" style={{ fontSize: '0.85rem' }}>{f.name}</strong>
+                      {f.desc[0] && (
+                        <p className="text-muted-theme mb-0" style={{ fontSize: '0.78rem' }}>
+                          {f.desc[0].slice(0, 220)}{f.desc[0].length > 220 ? '…' : ''}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {newSlots && (
+              <>
+                <h6 className="text-theme mt-3 mb-2">Spell Slots</h6>
+                <div className="d-flex flex-wrap gap-2" style={{ fontSize: '0.8rem' }}>
+                  {SLOT_LABELS.map((lvl) => {
+                    const key = `spell_slots_level_${lvl}`;
+                    const val = newSlots[key] || 0;
+                    const oldVal = oldSlots?.[key] || 0;
+                    if (val === 0) return null;
+                    return (
+                      <span key={lvl} className="badge-cls">
+                        Lvl {lvl}: {val}{val !== oldVal ? ` (was ${oldVal})` : ''}
+                      </span>
+                    );
+                  })}
+                  {typeof newSlots.cantrips_known === 'number' && (
+                    <span className="badge-cls">Cantrips: {newSlots.cantrips_known}</span>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
       </ModalBody>
       <ModalFooter>
-        {step !== 'hp' && (
+        {step !== 'choose-class' && (
           <button
             type="button"
             className="btn btn-outline-secondary btn-sm"
-            onClick={() => setStep(step === 'review' ? (isAsiLevel ? 'asi' : 'hp') : 'hp')}
+            onClick={() => {
+              if (step === 'hp') setStep('choose-class');
+              else if (step === 'subclass') setStep('hp');
+              else if (step === 'asi') setStep(needsSubclassChoice ? 'subclass' : 'hp');
+              else if (step === 'review') setStep(isAsiLevel ? 'asi' : (needsSubclassChoice ? 'subclass' : 'hp'));
+            }}
           >
             Back
           </button>
@@ -251,6 +410,16 @@ const LevelUpWizard = ({ isOpen, currentLevel, abilityScores, onCancel, onComple
         </button>
         {step === 'hp' && (
           <button type="button" className="btn btn-theme-primary btn-sm" onClick={goNextFromHp}>
+            Next
+          </button>
+        )}
+        {step === 'subclass' && (
+          <button
+            type="button"
+            className="btn btn-theme-primary btn-sm"
+            onClick={goNextFromSubclass}
+            disabled={!subclassIndex}
+          >
             Next
           </button>
         )}
@@ -265,8 +434,8 @@ const LevelUpWizard = ({ isOpen, currentLevel, abilityScores, onCancel, onComple
           </button>
         )}
         {step === 'review' && (
-          <button type="button" className="btn btn-theme-primary btn-sm" onClick={handleConfirm}>
-            Confirm Level Up
+          <button type="button" className="btn btn-theme-primary btn-sm" onClick={handleConfirm} disabled={submitting}>
+            {submitting ? 'Saving...' : 'Confirm Level Up'}
           </button>
         )}
       </ModalFooter>

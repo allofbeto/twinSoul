@@ -1,22 +1,26 @@
 import React from 'react';
-import { DND_RACES, DND_CLASSES } from '../constants';
+import { DND_RACES } from '../constants';
 import SearchBubbleInput from '../../../../components/formComponents/SearchBubbleInput';
+import ClassManager from './ClassManager';
+import { CharacterClassSummary } from '../classTypes';
 
 interface Props {
   max_hp: number;
   gold: number;
   inspo: number;
   race: string;
-  classes: string[];
+  characterId: string;
+  classSummaries: CharacterClassSummary[];
+  legacyClasses: string[];
+  supportsClasses: boolean;
+  onCharacterUpdated: (updated: any) => void;
   handleNumberChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
-  onToggleClass: (cls: string) => void;
-  onAddClass: (cls: string) => void;
   setFieldValue: (field: string, value: string) => void;
   isOwner: boolean;
 }
 
-const CharacterSidebar = ({ max_hp, inspo, gold, race, classes, handleNumberChange, onToggleClass, onAddClass, setFieldValue, isOwner }: Props) => {
+const CharacterSidebar = ({ max_hp, inspo, gold, race, characterId, classSummaries, legacyClasses, supportsClasses, onCharacterUpdated, handleNumberChange, setFieldValue, isOwner }: Props) => {
   return (
     <div className="character-sidebar card-theme p-4">
 
@@ -87,19 +91,17 @@ const CharacterSidebar = ({ max_hp, inspo, gold, race, classes, handleNumberChan
       {/* Classes */}
       <div className="character-sidebar-col">
         <span className="text-muted-theme mb-2">Classes</span>
-        {isOwner ? (
-          <SearchBubbleInput
-            options={DND_CLASSES}
-            selected={classes}
-            onAdd={onAddClass}
-            onRemove={onToggleClass}
-            placeholder="Search or create a class..."
-            multiSelect={true}
-            allowCreate={true}
+        {supportsClasses ? (
+          <ClassManager
+            characterId={characterId}
+            classSummaries={classSummaries}
+            legacyClasses={legacyClasses}
+            isOwner={isOwner}
+            onCharacterUpdated={onCharacterUpdated}
           />
         ) : (
           <div className="d-flex flex-wrap gap-1 mt-1">
-            {classes.length > 0 ? classes.map((cls) => (
+            {legacyClasses.length > 0 ? legacyClasses.map((cls) => (
               <span key={cls} className="badge-cls" style={{ fontSize: '0.8rem' }}>{cls}</span>
             )) : <span className="text-muted-theme">—</span>}
           </div>

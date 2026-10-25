@@ -14,6 +14,7 @@ export function rollExpression(raw: string): RollResult | null {
   let total = 0;
   let matched = false;
   const parts: string[] = [];
+  const dice: { sides: number; value: number }[] = [];
 
   while ((match = termRe.exec(cleaned)) !== null) {
     matched = true;
@@ -30,6 +31,7 @@ export function rollExpression(raw: string): RollResult | null {
       for (let i = 0; i < count; i += 1) {
         rolls.push(1 + Math.floor(Math.random() * sides));
       }
+      rolls.forEach((value) => dice.push({ sides, value }));
       const sub = rolls.reduce((a, b) => a + b, 0) * sign;
       total += sub;
       parts.push(`${sign < 0 ? '−' : ''}${count}d${sides}[${rolls.join(', ')}]`);
@@ -41,5 +43,5 @@ export function rollExpression(raw: string): RollResult | null {
   }
 
   if (!matched) return null;
-  return { expr: cleaned, total, detail: parts.join(' ') };
+  return { expr: cleaned, total, detail: parts.join(' '), dice };
 }

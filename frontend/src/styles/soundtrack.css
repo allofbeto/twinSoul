@@ -1,0 +1,61 @@
+/* Soundtrack: track cards, picker, editor. Works on the app theme and inside the notebook. */
+.trk-card, .trk-picker, .trk-editor, .trk-tags, .trk-list {
+  --trk-bg: var(--nb-bg, var(--color-background));
+  --trk-panel: var(--nb-panel, var(--color-surface));
+  --trk-card: var(--nb-card, var(--color-surface-raised, var(--color-surface)));
+  --trk-border: var(--nb-border, var(--color-border));
+  --trk-ink: var(--nb-ink, var(--color-text));
+  --trk-dim: var(--nb-dim, var(--color-text-muted));
+  --trk-accent: var(--nb-accent, var(--color-primary));
+}
+.trk-card { background: var(--trk-card); border: 1px solid var(--trk-border); border-left: 3px solid #f472b6; border-radius: 10px; padding: 9px 12px; color: var(--trk-ink); }
+.trk-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.trk-card-end { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
+.trk-note-icon { color: #f472b6; }
+.trk-title { font-size: 1rem; }
+.trk-mood { font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 0 8px; border: 1px solid var(--trk-border); border-radius: 99px; color: var(--trk-dim); }
+.trk-play { font-size: 0.8rem; color: var(--trk-accent); text-decoration: none; font-weight: 600; }
+.trk-play:hover { text-decoration: underline; }
+.trk-notes { margin: 6px 0 0; font-size: 0.82rem; color: var(--trk-dim); }
+.trk-note { font-size: 0.8rem; color: var(--trk-dim); padding: 4px 2px; }
+
+.trk-tag-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 7px; }
+.trk-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; padding: 1px 9px; border: 1px solid var(--trk-accent); border-radius: 99px; background: var(--trk-panel); color: var(--trk-ink); cursor: pointer; }
+.trk-chip button { background: none; border: 0; color: var(--trk-dim); cursor: pointer; padding: 0 0 0 2px; font-size: 0.9rem; line-height: 1; }
+.trk-chip button:hover { color: var(--color-error, #ef4444); }
+
+.trk-in { width: 100%; height: 34px; padding: 0 0.6rem; font: inherit; font-size: 0.88rem; background: var(--trk-bg); color: var(--trk-ink); border: 1px solid var(--trk-border); border-radius: var(--border-radius, 8px); }
+.trk-in:focus-visible, .trk-tag-input:focus-visible { outline: 2px solid var(--trk-accent); outline-offset: 1px; }
+.trk-picker, .trk-tags { position: relative; }
+.trk-menu { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; background: var(--trk-card); border: 1px solid var(--trk-border); border-radius: 10px; padding: 4px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); max-height: 260px; overflow-y: auto; }
+.trk-opt { display: flex; flex-direction: column; align-items: flex-start; width: 100%; text-align: left; background: transparent; border: 0; color: var(--trk-ink); padding: 6px 10px; border-radius: 7px; cursor: pointer; font-size: 0.88rem; }
+.trk-opt small { color: var(--trk-dim); font-size: 0.72rem; }
+.trk-opt:hover, .trk-opt:focus-visible { background: var(--trk-panel); }
+.trk-opt--create { color: var(--trk-accent); font-weight: 600; }
+.trk-legacy { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 0.82rem; }
+.trk-legacy a { color: var(--trk-accent); }
+
+.trk-tags .trk-tag-chips { margin-top: 0; padding: 4px 6px; min-height: 34px; background: var(--trk-bg); border: 1px solid var(--trk-border); border-radius: var(--border-radius, 8px); }
+.trk-tag-input { flex: 1 1 140px; min-width: 120px; border: 0; background: transparent; color: var(--trk-ink); font: inherit; font-size: 0.86rem; padding: 2px; }
+
+.trk-editor { background: var(--trk-card); border: 1px solid var(--trk-accent); border-radius: 12px; padding: 12px; color: var(--trk-ink); }
+.trk-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+.trk-span { grid-column: 1 / -1; }
+@media (max-width: 560px) { .trk-grid { grid-template-columns: 1fr; } }
+.trk-f { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.trk-f > span:first-child { font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--trk-dim); }
+.trk-actions { display: flex; gap: 8px; margin-top: 12px; }
+.trk-error { color: var(--color-error, #ef4444); font-size: 0.8rem; margin-top: 8px; }
+.trk-btn { background: var(--trk-panel); color: var(--trk-ink); border: 1px solid var(--trk-border); border-radius: var(--border-radius, 8px); padding: 5px 12px; font-size: 0.85rem; cursor: pointer; }
+.trk-btn:hover:not(:disabled) { border-color: var(--trk-accent); }
+.trk-btn--primary { background: var(--trk-accent); border-color: var(--trk-accent); color: var(--trk-bg); font-weight: 600; }
+.trk-btn--sm { padding: 1px 9px; font-size: 0.75rem; }
+.trk-btn--danger:hover:not(:disabled) { border-color: var(--color-error, #ef4444); color: var(--color-error, #ef4444); }
+
+/* soundtrack tab */
+.trk-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.trk-bar .trk-in { max-width: 260px; }
+.trk-filter { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.trk-filter button { background: transparent; border: 1px solid var(--trk-border); color: var(--trk-dim); border-radius: 99px; padding: 1px 11px; font-size: 0.78rem; cursor: pointer; }
+.trk-filter button.is-on { background: var(--trk-accent); color: var(--trk-bg); border-color: var(--trk-accent); font-weight: 600; }
+.trk-list { display: flex; flex-direction: column; gap: 10px; }

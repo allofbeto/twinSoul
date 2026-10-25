@@ -11,12 +11,13 @@ interface Props {
   handleNumberChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onImageUrlChange: (url: string) => void;
   onRequestLevelUp: () => void;
+  showLevelUp?: boolean;
   isOwner: boolean;
 }
 
 const CharacterArtBox = ({
   imageUrl, level, max_hp, current_hp, armor_class, temp_hp, temp_ac_bonus,
-  handleNumberChange, onImageUrlChange, onRequestLevelUp, isOwner,
+  handleNumberChange, onImageUrlChange, onRequestLevelUp, showLevelUp = true, isOwner,
 }: Props) => {
   const [editing, setEditing] = useState(false);
   const [urlInput, setUrlInput] = useState(imageUrl || '');
@@ -132,7 +133,7 @@ const CharacterArtBox = ({
             disabled={!isOwner}
           />
         </div>
-        {isOwner && (
+        {isOwner && showLevelUp && (
           <div className="character-stat character-stat--action">
             <button
               type="button"
