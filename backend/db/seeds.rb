@@ -8,3 +8,5 @@
 
 require_relative 'seeds/monsters'
 require_relative 'seeds/monster_habitats'
+require_relative 'seeds/char_classes'
+require_relative 'seeds/char_races'
