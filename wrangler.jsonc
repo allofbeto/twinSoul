@@ -3,9 +3,9 @@
   // The Rails API is NOT hosted here — point the build at it with REACT_APP_API_URL (see README).
   "name": "twinsoul",
   "compatibility_date": "2026-10-01",
-  // Builds the React app first (the root package.json script installs and builds frontend/),
-  // so the deploy works even when the dashboard's "Build command" is empty.
-  "build": { "command": "npm run build" },
+  // Builds the React app before reading frontend/build. (The root postinstall script also builds
+  // it on Cloudflare; --if-missing makes this a no-op when that already ran.)
+  "build": { "command": "node scripts/build-frontend.js --if-missing" },
   "assets": {
     "directory": "./frontend/build",
     // Deep links like /dashboard/sessions/123 fall back to index.html so React Router can handle them.

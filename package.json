@@ -3,6 +3,7 @@
     "reactstrap": "^9.2.3"
   },
   "scripts": {
-    "build": "npm --prefix frontend ci && npm --prefix frontend run build"
+    "build": "node scripts/build-frontend.js",
+    "postinstall": "node scripts/postinstall.js"
   }
 }
