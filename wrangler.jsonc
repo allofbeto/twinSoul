@@ -1,0 +1,11 @@
+{
+  // Cloudflare Workers Builds: serves the built React app (frontend/build) as static assets.
+  // The Rails API is NOT hosted here — point the build at it with REACT_APP_API_URL (see README).
+  "name": "twinsoul",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./frontend/build",
+    // Deep links like /dashboard/sessions/123 fall back to index.html so React Router can handle them.
+    "not_found_handling": "single-page-application"
+  }
+}
