@@ -97,7 +97,9 @@ const MentionList = forwardRef<any, MentionListProps>(({ items, command }, ref) 
 
 export const createSuggestion = (
   trigger: string,
-  fetchItems: (query: string) => Promise<SuggestionItem[]>
+  fetchItems: (query: string) => Promise<SuggestionItem[]>,
+  /** Hide this popup (and ignore keys) while the query matches — e.g. "@*" belongs to the create flow. */
+  standDown?: (query: string) => boolean
 ) => ({
   char: trigger,
   items: async ({ query }: { query: string }) => {
@@ -106,6 +108,11 @@ export const createSuggestion = (
   render: () => {
     let component: ReactRenderer;
     let popup: TippyInstance[];
+    let hidden = false;
+    const sync = (props: any) => {
+      hidden = !!standDown?.(props.query ?? '');
+      if (hidden) popup[0].hide(); else popup[0].show();
+    };
 
     return {
       onStart: (props: any) => {
@@ -123,12 +130,15 @@ export const createSuggestion = (
           trigger: 'manual',
           placement: 'bottom-start',
         });
+        sync(props);
       },
       onUpdate: (props: any) => {
         component.updateProps(props);
         popup[0].setProps({ getReferenceClientRect: props.clientRect });
+        sync(props);
       },
       onKeyDown: (props: any) => {
+        if (hidden) return false;
         if (props.event.key === 'Escape') {
           popup[0].hide();
           return true;

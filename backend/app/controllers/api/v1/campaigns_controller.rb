@@ -61,6 +61,6 @@ class Api::V1::CampaignsController < ApplicationController
     private
   
     def campaign_params
-      params.permit(:name, :description, :status)
+      params.permit(:name, :description, :status, :color)
     end
 end

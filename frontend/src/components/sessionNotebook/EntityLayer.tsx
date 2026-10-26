@@ -209,6 +209,7 @@ export default function EntityLayer({ rootRef, run }: Props) {
   const [panel, setPanel] = useState<Target | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -222,12 +223,16 @@ export default function EntityLayer({ rootRef, run }: Props) {
 
   const closePanel = useCallback(() => {
     setPanelOpen(false);
+    setLightbox(null);
     if (closeTimer.current) clearTimeout(closeTimer.current);
     closeTimer.current = setTimeout(() => setPanel(null), 260);
   }, []);
 
-  const cancelHide = () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
-  const scheduleHide = () => { cancelHide(); hideTimer.current = setTimeout(() => setHover(null), 180); };
+  const cancelHide = useCallback(() => { if (hideTimer.current) clearTimeout(hideTimer.current); }, []);
+  const scheduleHide = useCallback(() => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => setHover(null), 180);
+  }, []);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -257,16 +262,18 @@ export default function EntityLayer({ rootRef, run }: Props) {
       root.removeEventListener('click', click);
       cancelHide();
     };
-  }, [rootRef, run, openPanel]);
+  }, [rootRef, run, openPanel, cancelHide, scheduleHide]);
 
   // Esc or a click anywhere outside the drawer closes it. Clicking another tag
   // is left to the tag's own handler so the drawer swaps instead of flickering.
   useEffect(() => {
     if (!panelOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closePanel(); };
+    // Esc peels back one layer: the expanded image first, then the drawer.
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { if (lightbox) setLightbox(null); else closePanel(); } };
     const onDown = (e: MouseEvent) => {
       const el = e.target as Element;
-      if (panelRef.current?.contains(el) || el.closest('[data-kind][data-id]')) return;
+      // The expanded image lives outside the drawer's DOM, but clicking it must not close the drawer.
+      if (panelRef.current?.contains(el) || el.closest('.nb-lightbox') || el.closest('[data-kind][data-id]')) return;
       closePanel();
     };
     window.addEventListener('keydown', onKey);
@@ -275,7 +282,7 @@ export default function EntityLayer({ rootRef, run }: Props) {
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('mousedown', onDown);
     };
-  }, [panelOpen, closePanel]);
+  }, [panelOpen, closePanel, lightbox]);
 
   useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
 
@@ -298,8 +305,15 @@ export default function EntityLayer({ rootRef, run }: Props) {
       {panel && (
         <aside ref={panelRef} className={`nb-sidepanel ${panelOpen ? 'is-open' : ''}`} aria-label="Details" aria-hidden={!panelOpen}>
           <button type="button" className="nb-btn nb-btn--ghost nb-sidepanel-close" aria-label="Close details" onClick={closePanel}>✕</button>
-          <EntityBody t={panel} />
+          <EntityBody t={panel} onExpandImage={(url, name) => setLightbox({ url, name })} />
         </aside>
+      )}
+      {lightbox && (
+        <div className="nb-lightbox" role="dialog" aria-label={`${lightbox.name} image`} onClick={() => setLightbox(null)}>
+          <button type="button" className="nb-lightbox-close" aria-label="Close image" onClick={() => setLightbox(null)}>✕</button>
+          <img src={lightbox.url} alt={lightbox.name} onClick={(e) => e.stopPropagation()} />
+          <div className="nb-lightbox-cap">{lightbox.name}</div>
+        </div>
       )}
     </div>,
     host
@@ -394,8 +408,6 @@ function RollStage({ roll }: { roll: RollLog }) {
 }
 type Mode = 'normal' | 'adv' | 'dis';
 
-const d20 = () => 1 + Math.floor(Math.random() * 20);
-
 // Text with dice made clickable: "+5 to hit" rolls an attack, "(2d6 + 3)" rolls damage.
 function RollableText({ text, onRoll }: { text: string; onRoll: (label: string, kind: 'attack' | 'damage' | 'custom', expr: string) => void }) {
   const parts: React.ReactNode[] = [];
@@ -405,12 +417,13 @@ function RollableText({ text, onRoll }: { text: string; onRoll: (label: string, 
   let i = 0;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push(text.slice(last, m.index));
-    if (m[1]) {
-      parts.push(<button key={i++} type="button" className="nb-roll-inline" title="Roll attack" onClick={() => onRoll('Attack', 'attack', m![1])}>{m[0]}</button>);
+    const [full, toHit, dmg] = m;
+    if (toHit) {
+      parts.push(<button key={i++} type="button" className="nb-roll-inline" title="Roll attack" onClick={() => onRoll('Attack', 'attack', toHit)}>{full}</button>);
     } else {
-      parts.push(<button key={i++} type="button" className="nb-roll-inline" title="Roll damage" onClick={() => onRoll('Damage', 'damage', m![2])}>{m[0]}</button>);
+      parts.push(<button key={i++} type="button" className="nb-roll-inline" title="Roll damage" onClick={() => onRoll('Damage', 'damage', dmg)}>{full}</button>);
     }
-    last = m.index + m[0].length;
+    last = m.index + full.length;
   }
   if (last < text.length) parts.push(text.slice(last));
   return <>{parts}</>;
@@ -548,7 +561,8 @@ function HpTracker({ hp, canEdit, onChange }: { hp: Hp; canEdit: boolean; onChan
   );
 }
 
-function EntityBody({ t, compact, onQuickView }: { t: Target; compact?: boolean; onQuickView?: () => void }) {
+function EntityBody({ t, compact, onQuickView, onExpandImage }: { t: Target; compact?: boolean; onQuickView?: () => void; onExpandImage?: (url: string, name: string) => void }) {
+  const [badImage, setBadImage] = useState('');
   const [ent, setEnt] = useState<Entity | null>(null);
   const [failed, setFailed] = useState(false);
   const [mode, setMode] = useState<Mode>('normal');
@@ -624,8 +638,21 @@ function EntityBody({ t, compact, onQuickView }: { t: Target; compact?: boolean;
 
   return (
     <div className={compact ? 'nb-ent nb-ent--compact' : 'nb-ent'}>
+      {!compact && ent && (
+        <div className="nb-shot">
+          {ent.image && badImage !== ent.image ? (
+            <>
+              <button type="button" className="nb-shot-img" aria-label={`Expand ${ent.name} image`} onClick={() => onExpandImage?.(ent.image!, ent.name)}>
+                <img src={ent.image} alt={ent.name} onError={() => setBadImage(ent.image!)} />
+              </button>
+              <button type="button" className="nb-shot-expand" title="Expand image" onClick={() => onExpandImage?.(ent.image!, ent.name)}>⤢ Expand</button>
+            </>
+          ) : (
+            <div className="nb-shot-empty" aria-hidden="true">{ent.name.trim()[0]?.toUpperCase() ?? '?'}</div>
+          )}
+        </div>
+      )}
       <div className="nb-ent-head">
-        {ent?.image && !compact && <img className="nb-ent-img" src={ent.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
         <div className="nb-ent-title">
           <span className="nb-ent-kind">{icon} {KIND_LABEL[t.kind]}</span>
           <strong>{ent?.name ?? t.label}</strong>

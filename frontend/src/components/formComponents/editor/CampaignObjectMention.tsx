@@ -194,7 +194,11 @@ const SlashNameEntry = forwardRef<any, NameEntryProps>(({ icon, kindLabel, onSub
   );
 });
 
-export const createSlashCommandSuggestion = (onCreateObject: CreateCampaignObject) => {
+export const createSlashCommandSuggestion = (
+  onCreateObject: CreateCampaignObject,
+  opts: { char?: string; kinds?: AssetKind[]; pluginKey?: any } = {},
+) => {
+  const kindOptions = opts.kinds ? SLASH_KIND_OPTIONS.filter((o) => opts.kinds!.includes(o.type)) : SLASH_KIND_OPTIONS;
   const openNameEntry = (editor: any, item: KindOption, insertPos: number) => {
     let nameComponent: ReactRenderer | null = null;
     let namePopup: TippyInstance[] | null = null;
@@ -241,9 +245,10 @@ export const createSlashCommandSuggestion = (onCreateObject: CreateCampaignObjec
   };
 
   return {
-    char: '/',
+    char: opts.char ?? '/',
+    ...(opts.pluginKey ? { pluginKey: opts.pluginKey } : {}),
     items: ({ query }: { query: string }) =>
-      SLASH_KIND_OPTIONS.filter(
+      kindOptions.filter(
         (o) => o.label.toLowerCase().includes(query.toLowerCase()) || o.type.includes(query.toLowerCase()),
       ),
     render: () => {

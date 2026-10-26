@@ -7,7 +7,7 @@ import EntityLayer from './EntityLayer';
 import TrackPicker from './TrackPicker';
 import TrackCard from './TrackCard';
 import { useCampaignTracks } from './useTracks';
-import { ChevronDownIcon, ChevronUpIcon, CopyIcon, TrashIcon } from './Icons';
+import { ChevronDownIcon, ChevronUpIcon, CopyIcon, GripIcon, TrashIcon } from './Icons';
 import {
   BLOCK_TYPES, beatProgress, blockLabel, move, newBeat, newBlock, newScene, parseNotebook, sceneMatches,
   serializeNotebook, uid,
@@ -40,6 +40,7 @@ export default function SessionNotebook({
   const [open, setOpen] = useState<Set<string>>(() => new Set([nb.scenes[0].beats[0]?.id]));
   const [palette, setPalette] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [drag, setDrag] = useState<{ id: string; over?: string; after?: boolean } | null>(null);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const { tracks } = useCampaignTracks(campaignId);
@@ -94,6 +95,24 @@ export default function SessionNotebook({
     scenes.splice(scenes.findIndex((x) => x.id === scene.id) + 1, 0, copy);
     commit({ ...nbRef.current, scenes });
     pickScene(copy.id, copy);
+  };
+
+  // Reorder scenes: by buttons (±1) or by dragging a row to above/below another.
+  const moveSceneBy = (id: string, delta: number) => {
+    const list = nbRef.current.scenes;
+    const i = list.findIndex((x) => x.id === id);
+    const j = i + delta;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    commit({ ...nbRef.current, scenes: move(list, i, delta) });
+  };
+
+  const dropScene = (fromId: string, toId: string, after: boolean) => {
+    if (fromId === toId) return;
+    const list = nbRef.current.scenes.slice();
+    const [moving] = list.splice(list.findIndex((x) => x.id === fromId), 1);
+    const at = list.findIndex((x) => x.id === toId) + (after ? 1 : 0);
+    list.splice(at, 0, moving);
+    commit({ ...nbRef.current, scenes: list });
   };
 
   const deleteScene = () => {
@@ -309,11 +328,40 @@ export default function SessionNotebook({
   ) : (
     <nav className="nb-nav" aria-label="Scenes">
       <input className="nb-input" placeholder="Find a scene or beat…" value={query} onChange={(e) => setQuery(e.target.value)} />
-      {visibleScenes.map((s) => (
-        <button key={s.id} type="button" className={`nb-scene-btn ${s.id === scene.id ? 'is-active' : ''}`} onClick={() => pickScene(s.id)}>
-          {s.title}<span>{s.beats.length} beats</span>
-        </button>
-      ))}
+      {visibleScenes.map((s) => {
+        // Reordering only makes sense on the full, unfiltered list.
+        const canMove = !run && !query;
+        const idx = nb.scenes.findIndex((x) => x.id === s.id);
+        const over = drag?.over === s.id && drag.id !== s.id;
+        return (
+          <div
+            key={s.id}
+            className={`nb-scene-row ${s.id === scene.id ? 'is-active' : ''} ${drag?.id === s.id ? 'is-dragging' : ''} ${over ? (drag?.after ? 'is-over-after' : 'is-over-before') : ''}`}
+            draggable={canMove}
+            onDragStart={(e) => { if (!canMove) return; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', s.id); setDrag({ id: s.id }); }}
+            onDragOver={(e) => {
+              if (!drag) return;
+              e.preventDefault();
+              const r = e.currentTarget.getBoundingClientRect();
+              const after = e.clientY > r.top + r.height / 2;
+              if (drag.over !== s.id || drag.after !== after) setDrag({ id: drag.id, over: s.id, after });
+            }}
+            onDrop={(e) => { e.preventDefault(); if (drag) dropScene(drag.id, s.id, !!drag.after); setDrag(null); }}
+            onDragEnd={() => setDrag(null)}
+          >
+            {canMove && <span className="nb-grip" aria-hidden="true" title="Drag to reorder"><GripIcon /></span>}
+            <button type="button" className={`nb-scene-btn ${s.id === scene.id ? 'is-active' : ''}`} onClick={() => pickScene(s.id)}>
+              {s.title}<span>{s.beats.length} beats</span>
+            </button>
+            {canMove && (
+              <span className="nb-scene-move">
+                <button type="button" className="nb-btn nb-btn--ghost nb-btn--sm" disabled={idx === 0} onClick={() => moveSceneBy(s.id, -1)} aria-label={`Move ${s.title} up`} title="Move up"><ChevronUpIcon /></button>
+                <button type="button" className="nb-btn nb-btn--ghost nb-btn--sm" disabled={idx === nb.scenes.length - 1} onClick={() => moveSceneBy(s.id, 1)} aria-label={`Move ${s.title} down`} title="Move down"><ChevronDownIcon /></button>
+              </span>
+            )}
+          </div>
+        );
+      })}
       {!visibleScenes.length && <div className="nb-note">No matches</div>}
       {!run && <button type="button" className="nb-btn nb-btn--primary nb-block-btn" onClick={addScene}>＋ Scene</button>}
     </nav>
@@ -332,7 +380,13 @@ export default function SessionNotebook({
                 className="nb-scene-title-input" value={scene.title} aria-label="Scene title"
                 onChange={(e) => patchScene((s) => ({ ...s, title: e.target.value }))}
               />
-              {compact && <button type="button" className="nb-btn nb-btn--sm" onClick={addScene}>＋ Scene</button>}
+              {compact && (
+                <>
+                  <button type="button" className="nb-btn nb-btn--ghost nb-btn--sm" disabled={nb.scenes[0]?.id === scene.id} onClick={() => moveSceneBy(scene.id, -1)} aria-label="Move scene up" title="Move scene up"><ChevronUpIcon /></button>
+                  <button type="button" className="nb-btn nb-btn--ghost nb-btn--sm" disabled={nb.scenes[nb.scenes.length - 1]?.id === scene.id} onClick={() => moveSceneBy(scene.id, 1)} aria-label="Move scene down" title="Move scene down"><ChevronDownIcon /></button>
+                  <button type="button" className="nb-btn nb-btn--sm" onClick={addScene}>＋ Scene</button>
+                </>
+              )}
             </div>
           )}
           {run && <h2 className="nb-scene-title">{scene.title}</h2>}

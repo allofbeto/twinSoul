@@ -94,6 +94,8 @@ export default function NpcBuilder({ mode, initial, isOwner, onSave, onCreate, o
   const [error, setError] = useState('');
   const [confirmDel, setConfirmDel] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [badImage, setBadImage] = useState(''); // the URL that failed to load, if any
+  const [editingPortrait, setEditingPortrait] = useState(false);
   const dirty = useRef(false);
   const first = useRef(true);
 
@@ -182,11 +184,30 @@ export default function NpcBuilder({ mode, initial, isOwner, onSave, onCreate, o
       <div className="npcb-body">
         {/* ---------- live card ---------- */}
         <aside className="npcb-card" aria-label="NPC summary">
-          <div className="npcb-portrait">
-            {npc.image_url
-              ? <img src={npc.image_url} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          <button
+            type="button" className="npcb-portrait" disabled={off}
+            title={off ? undefined : 'Set portrait image'} aria-label={off ? 'Portrait' : 'Set portrait image'}
+            onClick={() => setEditingPortrait((v) => !v)}
+          >
+            {npc.image_url && badImage !== npc.image_url
+              ? <img src={npc.image_url} alt="" onError={() => setBadImage(npc.image_url)} />
               : <span>{npc.name.trim() ? npc.name.trim()[0].toUpperCase() : '?'}</span>}
-          </div>
+            {!off && <em className="npcb-portrait-hint">{npc.image_url ? 'Change' : '＋ Add image'}</em>}
+          </button>
+          {editingPortrait && !off && (
+            <div className="npcb-portrait-edit">
+              <input
+                className="npcb-portrait-input" autoFocus placeholder="Paste an image URL" aria-label="Portrait image URL"
+                value={npc.image_url} onChange={(e) => set({ image_url: e.target.value.trim() })}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); setEditingPortrait(false); } }}
+              />
+              <div className="npcb-portrait-actions">
+                <button type="button" className="btn btn-sm btn-theme-primary" onClick={() => setEditingPortrait(false)}>Done</button>
+                {npc.image_url && <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => { set({ image_url: '' }); setEditingPortrait(false); }}>Remove</button>}
+              </div>
+            </div>
+          )}
+          {npc.image_url && badImage === npc.image_url && <div className="npcb-portrait-error">Couldn’t load that image — check the link.</div>}
           <h3 className="npcb-card-name">{npc.name || 'Unnamed NPC'}</h3>
           <div className="npcb-card-sub">
             <span className={`npc-disposition-badge npc-disposition-${npc.disposition}`}>{npc.disposition}</span>
@@ -264,7 +285,8 @@ export default function NpcBuilder({ mode, initial, isOwner, onSave, onCreate, o
                 </div>
                 <div className="col-12">
                   <label className="form-label text-muted-theme">Portrait URL</label>
-                  <input className="form-control input-theme" placeholder="https://…" value={npc.image_url} disabled={off} onChange={(e) => set({ image_url: e.target.value })} />
+                  <input className="form-control input-theme" placeholder="https://…" value={npc.image_url} disabled={off} onChange={(e) => set({ image_url: e.target.value.trim() })} />
+                  {npc.image_url && badImage === npc.image_url && <small className="text-danger">Couldn’t load that image — check the link.</small>}
                 </div>
               </div>
               <h6 className="npcb-h">Traits of the creature</h6>

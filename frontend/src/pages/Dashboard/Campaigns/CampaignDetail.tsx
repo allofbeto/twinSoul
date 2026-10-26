@@ -6,12 +6,15 @@ import CampaignPlayers from './Components/CampaignPlayers';
 import CampaignSessions from './Components/CampaignSessions';
 import CampaignItems from './Components/CampaignItems';
 import CampaignSoundtrack from './Components/CampaignSoundtrack';
+import { campaignColor } from '../../../utils/campaignColor';
+import '../../../styles/campaignColor.css';
 
 interface Campaign {
   id: string;
   name: string;
   description: string;
   status: string;
+  color?: string | null;
 }
 
 interface Character {
@@ -75,6 +78,11 @@ const CampaignDetail = () => {
     setIsDirty(true);
   };
 
+  const handleColorChange = (color: string) => {
+    setForm({ ...form!, color });
+    setIsDirty(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -98,7 +106,7 @@ const CampaignDetail = () => {
     <div>
       <form onSubmit={handleSubmit}>
         {/* Sticky Top Bar */}
-        <div className="sticky-save-bar">
+        <div className="sticky-save-bar camp-accent-bar" style={{ ['--camp-accent' as any]: campaignColor(form.id, form.color) }}>
           <div className="d-flex align-items-center justify-content-between">
             <div>
               <h2 className="text-theme mb-0">{form.name}</h2>
@@ -144,6 +152,7 @@ const CampaignDetail = () => {
               form={form}
               players={players}
               handleChange={handleChange}
+              onColorChange={handleColorChange}
             />
           )}
         </div>

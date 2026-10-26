@@ -1,3 +1,4 @@
+import { campaignColor } from '../../../utils/campaignColor';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCampaigns, deleteCampaign } from '../../../api/backendHelpers';
@@ -7,6 +8,7 @@ interface Campaign {
   name: string;
   description: string;
   status: string;
+  color?: string | null;
   created_at: string;
 }
 
@@ -67,7 +69,7 @@ const Campaigns = () => {
         <div className="row g-3">
           {campaigns.map((campaign) => (
             <div className="col-md-6 col-lg-4" key={campaign.id}>
-              <div className="card-theme p-4 h-100 d-flex flex-column justify-content-between">
+              <div className="card-theme p-4 h-100 d-flex flex-column justify-content-between" style={{ borderTop: `3px solid ${campaignColor(campaign.id, campaign.color)}` }}>
                 <div>
                   <div className="d-flex justify-content-between align-items-start mb-2">
                     <h5 className="text-theme mb-0">{campaign.name}</h5>

@@ -10,6 +10,8 @@ Rails.application.routes.draw do
       get 'campaigns/:campaign_id/characters', to: 'characters#campaign_characters'
       get 'campaigns/:campaign_id/items', to: 'items#campaign_items'
       post 'campaigns/:campaign_id/items', to: 'items#create_campaign_item'
+      get 'campaigns/:campaign_id/tracks', to: 'tracks#index'
+      post 'campaigns/:campaign_id/tracks', to: 'tracks#create'
       post 'characters/:id/migrate_inventory', to: 'characters#migrate_inventory'
       get 'users/search', to: 'users#search'
       resources :campaigns do
@@ -20,12 +22,17 @@ Rails.application.routes.draw do
         resource :inventory, only: [:show, :create] do
           resources :items, only: [:index, :create, :update, :destroy]
         end
+        resources :character_classes, only: [:create, :update, :destroy]
+        resource :level_up, only: [:create], controller: 'character_level_ups'
       end
       resources :image_assets, only: [:index, :create, :destroy]
       resources :monsters, only: [:index, :show]
+      resources :char_classes, only: [:index, :show]
+      resources :char_races, only: [:index, :show]
       resources :items
       resources :sessions, only: [:index, :create, :update, :destroy]
       resources :encounters
+      resources :tracks, only: [:update, :destroy]
       resource :user, only: [:show, :update, :destroy] do
         patch :deactivate
         patch :close

@@ -110,3 +110,20 @@ export function notesPreview(raw: string | null | undefined, max = 200): string 
     .replace(/\s+/g, ' ');
   return text.length > max ? text.slice(0, max) + '…' : text;
 }
+
+/** Counts and a one-line excerpt for session cards and tables. */
+export function notebookStats(raw: string | null | undefined) {
+  const nb = parseNotebook(raw);
+  const beats = nb.scenes.flatMap((s) => s.beats);
+  const excerpt = beats
+    .flatMap((b) => b.blocks)
+    .map((x) => stripHtml(x.content).replace(/\s+/g, ' ').trim())
+    .find(Boolean) ?? '';
+  return {
+    scenes: nb.scenes.length,
+    beats: beats.length,
+    done: beats.filter((b) => b.done).length,
+    blocks: beats.reduce((n, b) => n + b.blocks.length, 0),
+    excerpt: excerpt.length > 170 ? `${excerpt.slice(0, 170)}…` : excerpt,
+  };
+}

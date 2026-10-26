@@ -4,6 +4,8 @@ import { getSessions, getCampaigns, updateSession, deleteSession, createCampaign
 import SessionNotebook from '../../../components/sessionNotebook/SessionNotebook';
 import type { AssetKind } from '../Theatre/Components/types';
 import { TrashIcon } from '../../../components/sessionNotebook/Icons';
+import { campaignColor } from '../../../utils/campaignColor';
+import '../../../styles/campaignColor.css';
 import { Modal, ModalHeader, ModalBody } from 'reactstrap';
 
 interface Session {
@@ -31,7 +33,7 @@ const SessionDetail = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalFunction, setModalFunction] = useState<string | null>(null);
 
-  const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([]);
+  const [campaigns, setCampaigns] = useState<{ id: string; name: string; color?: string | null }[]>([]);
 
   const formRef = useRef<Session | null>(null);
   formRef.current = form;
@@ -133,7 +135,10 @@ const SessionDetail = () => {
   return (
     <div>
       {/* Sticky Top Bar */}
-      <div className="sticky-save-bar">
+      <div
+        className={`sticky-save-bar ${form.campaign_id ? 'camp-accent-bar' : ''}`}
+        style={form.campaign_id ? ({ ['--camp-accent' as any]: campaignColor(form.campaign_id, campaigns.find((c) => c.id === form.campaign_id)?.color) } as React.CSSProperties) : undefined}
+      >
         <div className="d-flex align-items-center justify-content-between">
           <div className="d-flex align-items-center gap-3">
             <button

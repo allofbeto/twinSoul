@@ -1,11 +1,13 @@
 import React from 'react';
 import RichTextEditor from '../../../../components/formComponents/RichTextEditor';
+import { CAMPAIGN_SWATCHES, campaignColor, isHexColor } from '../../../../utils/campaignColor';
 
 interface Campaign {
   id: string;
   name: string;
   description: string;
   status: string;
+  color?: string | null;
 }
 
 interface Player {
@@ -17,9 +19,11 @@ interface Props {
   form: Campaign;
   players: Player[];
   handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  onColorChange: (color: string) => void;
 }
 
-const CampaignOverview = ({ form, players, handleChange }: Props) => {
+const CampaignOverview = ({ form, players, handleChange, onColorChange }: Props) => {
+  const accent = campaignColor(form.id, form.color);
   const activePlayers = players.filter((p) => p.active).length;
 
   return (
@@ -71,6 +75,24 @@ const CampaignOverview = ({ form, players, handleChange }: Props) => {
             <option value="inactive">Inactive</option>
             <option value="archived">Archived</option>
           </select>
+        </div>
+        <div className="mb-1">
+          <label className="form-label text-muted-theme">Color</label>
+          <div className="camp-color">
+            <span className="camp-color-preview" style={{ background: accent }} title="Current color" />
+            <div className="camp-swatches" role="group" aria-label="Campaign color">
+              {CAMPAIGN_SWATCHES.map((c) => (
+                <button key={c} type="button" className={`camp-swatch ${form.color?.toLowerCase() === c ? 'is-on' : ''}`} style={{ background: c }}
+                  aria-label={`Use ${c}`} aria-pressed={form.color?.toLowerCase() === c} onClick={() => onColorChange(c)} />
+              ))}
+              <label className="camp-swatch camp-swatch--custom" title="Pick any color">
+                <input type="color" value={isHexColor(form.color) ? form.color : '#c9a94a'} onChange={(e) => onColorChange(e.target.value)} aria-label="Custom color" />
+                +
+              </label>
+            </div>
+            <button type="button" className="btn btn-sm btn-outline-secondary" disabled={!form.color} onClick={() => onColorChange('')}>Auto</button>
+          </div>
+          <small className="text-muted-theme">Shows up on this campaign’s sessions, cards and header. “Auto” picks one for you.</small>
         </div>
       </div>
 

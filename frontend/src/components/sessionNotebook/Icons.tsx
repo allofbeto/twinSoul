@@ -15,6 +15,9 @@ export const TrashIcon = () => (
     <path d="M10 11v6M14 11v6" />
   </Svg>
 );
+export const GripIcon = () => (
+  <Svg><circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="9" cy="18" r="1" /><circle cx="15" cy="18" r="1" /></Svg>
+);
 export const ChevronUpIcon = () => <Svg><path d="M6 15l6-6 6 6" /></Svg>;
 export const ChevronDownIcon = () => <Svg><path d="M6 9l6 6 6-6" /></Svg>;
 export const CopyIcon = () => (

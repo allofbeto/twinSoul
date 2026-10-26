@@ -3,6 +3,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Mention from '@tiptap/extension-mention';
+import { PluginKey } from '@tiptap/pm/state';
 import { getItems } from '../../api/backendHelpers';
 import { KIND_LABEL, KIND_ORDER, loadRefs } from './refs';
 import { createSuggestion } from '../formComponents/editor/MentionSuggestion';
@@ -44,7 +45,10 @@ interface Props {
 // One small rich-text field per block. Keeps the @ character, # item and
 // "/" create-object tagging from the old full-page editor.
 export default function BlockEditor({ content, onChange, placeholder, campaignId, onCreateObject }: Props) {
+  // Quick-create needs somewhere to put the new NPC/item/location: a campaign.
+  const canQuickCreate = !!onCreateObject && !!campaignId;
   const extensions = useMemo(() => {
+    // "@*" is the quick-create trigger, so the normal "@" search stands down for it.
     const refs = createSuggestion('@', async (query) => {
       const q = query.toLowerCase();
       return (await loadRefs(campaignId))
@@ -52,7 +56,7 @@ export default function BlockEditor({ content, onChange, placeholder, campaignId
         .sort((x, y) => KIND_ORDER.indexOf(x.kind) - KIND_ORDER.indexOf(y.kind))
         .slice(0, 10)
         .map((r) => ({ ...r, type: KIND_LABEL[r.kind] ?? r.kind }));
-    });
+    }, (q) => canQuickCreate && q.startsWith('*'));
     const items = createSuggestion('#', async (query) => {
       const res = await getItems();
       return res.data
@@ -71,6 +75,19 @@ export default function BlockEditor({ content, onChange, placeholder, campaignId
         HTMLAttributes: { class: 'mention mention-item' },
         suggestion: items,
       }),
+      // "@*" → pick NPC / Item / Location → name it → it's created in the campaign and tagged here.
+      ...(canQuickCreate
+        ? [
+            CampaignObjectMention.extend({ name: 'campaignObjectStar' }).configure({
+              HTMLAttributes: { class: 'mention mention-object' },
+              suggestion: createSlashCommandSuggestion(onCreateObject!, {
+                char: '@*',
+                kinds: ['npc', 'item', 'map'],
+                pluginKey: new PluginKey('campaignObjectStar'),
+              }),
+            }),
+          ]
+        : []),
       ...(onCreateObject
         ? [
             CampaignObjectMention.configure({
@@ -119,7 +136,7 @@ export default function BlockEditor({ content, onChange, placeholder, campaignId
         {btn(() => editor.chain().focus().toggleUnderline().run(), 'U', editor.isActive('underline'))}
         {btn(() => editor.chain().focus().toggleBulletList().run(), '• List', editor.isActive('bulletList'))}
         {btn(() => editor.chain().focus().toggleBlockquote().run(), '❝', editor.isActive('blockquote'))}
-        <span className="nb-hint">@ character, NPC, place or item · # item{onCreateObject ? ' · / new…' : ''}</span>
+        <span className="nb-hint">@ character, NPC, place or item{canQuickCreate ? ' · @* create new' : ''} · # item</span>
       </div>
       <EditorContent editor={editor} />
     </div>

@@ -403,3 +403,37 @@ body.theme-magic .nb .nb-editable.ProseMirror h3 { color: var(--nb-accent); }
 
 /* labelled buttons (icon + text) size to their content, never the square icon-button box */
 .nb-scene-actions .nb-btn { width: auto; height: auto; padding: 4px 10px; white-space: nowrap; flex: 0 0 auto; }
+
+/* scene list: drag to reorder, or use the arrows */
+.nb-scene-row { position: relative; display: flex; align-items: center; gap: 2px; border-radius: var(--border-radius, 8px); }
+.nb-scene-row .nb-scene-btn { flex: 1; min-width: 0; }
+.nb-scene-row .nb-scene-btn:not(.is-active) { border-color: transparent; }
+.nb-grip { color: var(--nb-dim); opacity: 0; cursor: grab; display: inline-flex; padding: 0 2px; transition: opacity 0.12s; }
+.nb-scene-row:hover .nb-grip, .nb-scene-row:focus-within .nb-grip { opacity: 0.8; }
+.nb-scene-row:active .nb-grip { cursor: grabbing; }
+.nb-scene-move { display: inline-flex; flex-direction: column; gap: 0; opacity: 0; transition: opacity 0.12s; flex: 0 0 auto; }
+.nb-scene-row:hover .nb-scene-move, .nb-scene-row:focus-within .nb-scene-move { opacity: 1; }
+.nb-scene-move .nb-btn--ghost.nb-btn--sm:has(> svg:only-child) { width: 22px; height: 18px; }
+.nb-scene-row.is-dragging { opacity: 0.4; }
+.nb-scene-row.is-over-before::before, .nb-scene-row.is-over-after::after { content: ''; position: absolute; left: 0; right: 0; height: 3px; border-radius: 3px; background: var(--nb-accent); z-index: 2; }
+.nb-scene-row.is-over-before::before { top: -3px; }
+.nb-scene-row.is-over-after::after { bottom: -3px; }
+@media (hover: none) { .nb-grip, .nb-scene-move { opacity: 1; } }
+
+/* quick view profile shot + expanded image */
+.nb-shot { position: relative; margin: 0 0 0.9rem; border-radius: 14px; overflow: hidden; border: 1px solid var(--nb-border); background: var(--nb-card); aspect-ratio: 4 / 3; max-height: 300px; width: 100%; }
+.nb-shot-img { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.nb-shot-img img { width: 100%; height: 100%; object-fit: cover; object-position: center 22%; display: block; }
+.nb-shot-img:focus-visible { outline: 2px solid var(--nb-accent); outline-offset: -2px; }
+.nb-shot-expand { position: absolute; right: 8px; bottom: 8px; background: rgba(0, 0, 0, 0.62); color: #fff; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 8px; padding: 3px 10px; font-size: 0.76rem; cursor: pointer; backdrop-filter: blur(4px); }
+.nb-shot-expand:hover { background: rgba(0, 0, 0, 0.82); border-color: var(--nb-accent); }
+.nb-shot-empty { height: 100%; display: flex; align-items: center; justify-content: center; font-family: var(--nb-font-head); font-size: 4.5rem; color: var(--nb-accent); background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--nb-accent) 18%, var(--nb-card)), var(--nb-card)); }
+.nb-ent-head { margin-bottom: 0.2rem; }
+
+.nb-lightbox { position: fixed; inset: 0; z-index: 2147483200; background: rgba(0, 0, 0, 0.88); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.7rem; padding: 2.5rem 1rem 1.5rem; animation: nb-fade 0.18s ease; cursor: zoom-out; }
+.nb-lightbox img { max-width: min(94vw, 1100px); max-height: 82vh; object-fit: contain; border-radius: 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7); cursor: default; }
+.nb-lightbox-cap { color: #e8e8e8; font-size: 0.9rem; letter-spacing: 0.04em; }
+.nb-lightbox-close { position: absolute; top: 14px; right: 18px; background: rgba(255, 255, 255, 0.12); color: #fff; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: 1rem; }
+.nb-lightbox-close:hover { background: rgba(255, 255, 255, 0.24); }
+@keyframes nb-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .nb-lightbox { animation: none; } }

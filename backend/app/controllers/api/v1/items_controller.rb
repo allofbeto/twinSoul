@@ -1,4 +1,12 @@
 class Api::V1::ItemsController < ApplicationController
+  # One shape for every action-economy entry; attacks fill in the roll fields.
+  FEATURE_KEYS = [:name, :desc, :attack_bonus, :damage, :damage_type, :range, :save, :uses,
+                  :attack_ability, :attack_proficient, :attack_die, :attack_roll,
+                  :damage_mode, :damage_dice_count, :damage_dice_sides, :damage_bonus,
+                  :damage_ability, :damage_flat, :save_ability, :save_dc, :save_dc_ability,
+                  :roll_kind, :check_with, :roll_bonus, :roll_expr, :roll_label,
+                  { damages: [:mode, :dice_count, :dice_sides, :bonus, :ability, :flat, :text, :type] }].freeze
+
   include Authenticatable
   wrap_parameters false
 
@@ -109,9 +117,14 @@ class Api::V1::ItemsController < ApplicationController
 
   def item_params
     params.permit(:name, :notes, :attunement, :consumable, :campaign_id, :kind, :image_url,
-      :armor_class, :max_hp, :current_hp, :challenge_rating, :disposition,
+      :armor_class, :max_hp, :current_hp, :temp_hp, :challenge_rating, :disposition,
       :strength, :dexterity, :constitution, :intelligence, :wisdom, :charisma,
-      categories: [], visible_sections: [],
-      traits: [:name, :desc], actions: [:name, :desc], legendary_actions: [:name, :desc])
+      :speed, :senses, :languages, :defenses,
+      categories: [], visible_sections: [], skills: [], saving_throws: [],
+      traits: FEATURE_KEYS, actions: FEATURE_KEYS, bonus_actions: FEATURE_KEYS,
+      reactions: FEATURE_KEYS, legendary_actions: FEATURE_KEYS,
+      spells: [:name, :level, :uses, :concentration, :desc],
+      equipment: [:name, :qty, :desc],
+      spellcasting: [:ability, { slots: {} }])
   end
 end

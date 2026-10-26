@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_09_14_022916) do
+ActiveRecord::Schema[7.0].define(version: 2026_10_25_163557) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -23,8 +23,64 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_14_022916) do
     t.string "status", default: "active"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "color"
     t.index ["inventory_id"], name: "index_campaigns_on_inventory_id"
     t.index ["user_id"], name: "index_campaigns_on_user_id"
+  end
+
+  create_table "char_classes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "index", null: false
+    t.string "name", null: false
+    t.integer "hit_die", null: false
+    t.string "proficiencies", default: [], array: true
+    t.jsonb "proficiency_choices", default: []
+    t.string "saving_throws", default: [], array: true
+    t.jsonb "starting_equipment", default: []
+    t.jsonb "starting_equipment_options", default: []
+    t.string "spellcasting_ability"
+    t.jsonb "spellcasting_info", default: []
+    t.jsonb "multi_classing", default: {}
+    t.jsonb "subclasses", default: []
+    t.jsonb "levels", default: []
+    t.integer "subclass_choice_level"
+    t.string "source", default: "SRD 5.1"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "game", default: "dnd_5e", null: false
+    t.index ["game", "index"], name: "index_char_classes_on_game_and_index", unique: true
+  end
+
+  create_table "char_races", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "game", default: "dnd_5e", null: false
+    t.string "index", null: false
+    t.string "name", null: false
+    t.integer "speed"
+    t.string "size"
+    t.text "size_description"
+    t.text "age"
+    t.text "alignment"
+    t.text "language_desc"
+    t.string "languages", default: [], array: true
+    t.jsonb "ability_bonuses", default: []
+    t.jsonb "traits", default: []
+    t.jsonb "subraces", default: []
+    t.string "source", default: "SRD 5.1"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game", "index"], name: "index_char_races_on_game_and_index", unique: true
+  end
+
+  create_table "character_classes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "character_id", null: false
+    t.uuid "char_class_id"
+    t.string "custom_name"
+    t.integer "level", default: 1, null: false
+    t.string "subclass_index"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["char_class_id"], name: "index_character_classes_on_char_class_id"
+    t.index ["character_id", "char_class_id"], name: "index_character_classes_on_character_and_class", unique: true, where: "(char_class_id IS NOT NULL)"
+    t.index ["character_id"], name: "index_character_classes_on_character_id"
   end
 
   create_table "characters", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -143,6 +199,18 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_14_022916) do
     t.jsonb "actions", default: []
     t.jsonb "legendary_actions", default: []
     t.string "visible_sections", default: [], array: true
+    t.string "skills", default: [], array: true
+    t.integer "temp_hp", default: 0, null: false
+    t.jsonb "bonus_actions", default: []
+    t.jsonb "reactions", default: []
+    t.jsonb "spells", default: []
+    t.jsonb "spellcasting", default: {}
+    t.jsonb "equipment", default: []
+    t.string "saving_throws", default: [], array: true
+    t.string "speed"
+    t.string "senses"
+    t.string "languages"
+    t.text "defenses"
     t.index ["campaign_id"], name: "index_items_on_campaign_id"
     t.index ["inventory_id"], name: "index_items_on_inventory_id"
     t.index ["user_id"], name: "index_items_on_user_id"
@@ -218,6 +286,20 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_14_022916) do
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 
+  create_table "tracks", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "campaign_id", null: false
+    t.uuid "user_id", null: false
+    t.string "title", null: false
+    t.string "url"
+    t.string "mood"
+    t.text "notes"
+    t.jsonb "refs", default: []
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["campaign_id"], name: "index_tracks_on_campaign_id"
+    t.index ["user_id"], name: "index_tracks_on_user_id"
+  end
+
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "first_name", null: false
     t.string "last_name", null: false
@@ -235,6 +317,8 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_14_022916) do
 
   add_foreign_key "campaigns", "inventories"
   add_foreign_key "campaigns", "users"
+  add_foreign_key "character_classes", "char_classes"
+  add_foreign_key "character_classes", "characters"
   add_foreign_key "characters", "campaigns"
   add_foreign_key "characters", "image_assets", column: "profile_image_id"
   add_foreign_key "characters", "users"
@@ -256,4 +340,6 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_14_022916) do
   add_foreign_key "players", "users"
   add_foreign_key "sessions", "campaigns"
   add_foreign_key "sessions", "users"
+  add_foreign_key "tracks", "campaigns"
+  add_foreign_key "tracks", "users"
 end
