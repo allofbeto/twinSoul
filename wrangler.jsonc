@@ -1,7 +1,7 @@
 {
   // Cloudflare Workers Builds: serves the built React app (frontend/build) as static assets.
   // The Rails API is NOT hosted here — point the build at it with REACT_APP_API_URL (see README).
-  "name": "twinsoul",
+  "name": "tttools",
   "compatibility_date": "2026-10-01",
   // Builds the React app before reading frontend/build. (The root postinstall script also builds
   // it on Cloudflare; --if-missing makes this a no-op when that already ran.)

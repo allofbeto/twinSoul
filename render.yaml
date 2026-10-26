@@ -1,0 +1,38 @@
+# Render Blueprint: the Rails API + its Postgres database.
+# Dashboard: New + → Blueprint → pick this repo. See the README section "Deploying" for the rest.
+databases:
+  - name: twinsoul-db
+    databaseName: twinsoul
+    user: twinsoul
+    plan: free
+
+services:
+  - type: web
+    name: twinsoul-api
+    runtime: ruby
+    plan: free
+    rootDir: backend
+    buildCommand: bundle install
+    startCommand: ./bin/render-start.sh
+    healthCheckPath: /healthz
+    envVars:
+      - key: RAILS_ENV
+        value: production
+      - key: RAILS_LOG_TO_STDOUT
+        value: "true"
+      - key: RAILS_SERVE_STATIC_FILES
+        value: "true"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: twinsoul-db
+          property: connectionString
+      # Signs login tokens and sessions; Render generates a random one.
+      - key: SECRET_KEY_BASE
+        generateValue: true
+      # The address of the website that is allowed to call this API. Comma-separate more.
+      - key: CORS_ORIGINS
+        value: https://tttools.carrazco2013.workers.dev
+      # One Puma process (threads only): keeps memory low and lets the in-process live-connection
+      # adapter work. Raise it only after adding Redis (REDIS_URL).
+      - key: WEB_CONCURRENCY
+        value: "0"

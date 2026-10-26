@@ -1,4 +1,7 @@
 Rails.application.routes.draw do
+  # Plain 200 for hosting health checks (Rails 7.0 has no built-in /up).
+  get '/healthz', to: proc { [200, { 'Content-Type' => 'text/plain' }, ['ok']] }
+
   mount ActionCable.server => '/cable'
 
   namespace :api do
