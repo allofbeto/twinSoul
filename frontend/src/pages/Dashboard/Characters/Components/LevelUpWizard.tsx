@@ -2,8 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { Modal, ModalBody, ModalHeader, ModalFooter } from 'reactstrap';
 import { ABILITY_SCORES } from '../constants';
 import { useCharClasses, findCharClass } from '../useCharClasses';
-import { CharacterClassSummary, getFeaturesGainedAt, requiresSubclassChoiceAt, spellSlotsAt } from '../classTypes';
+import { CharacterClassSummary, classResources, getFeaturesGainedAt, isAsiLevel as classAsiLevel, requiresSubclassChoiceAt, spellSlotsAt } from '../classTypes';
+import { CharacterFeat, useFeats } from '../featTypes';
+import ClassIcon, { classIconKey } from './ClassIcon';
 import { levelUpCharacter } from '../../../../api/backendHelpers';
+import { isSelectableBy } from '../referenceCache';
+import { useAuth } from '../../../../context/AuthContext';
 
 type AbilityKey = 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'charisma';
 
@@ -21,6 +25,7 @@ interface Props {
   characterId: string;
   currentLevel: number;
   classSummaries: CharacterClassSummary[];
+  feats?: CharacterFeat[];
   abilityScores: AbilityScoresShape;
   onCancel: () => void;
   onComplete: (updatedCharacter: any) => void;
@@ -28,10 +33,17 @@ interface Props {
 
 const getModifier = (score: number) => Math.floor((score - 10) / 2);
 
+const ABILITY_SHORT_TO_KEY: Record<string, AbilityKey> = {
+  str: 'strength', dex: 'dexterity', con: 'constitution', int: 'intelligence', wis: 'wisdom', cha: 'charisma',
+};
+const ABILITY_KEY_TO_SHORT = Object.fromEntries(Object.entries(ABILITY_SHORT_TO_KEY).map(([k, v]) => [v, k])) as Record<AbilityKey, string>;
+
 const SLOT_LABELS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abilityScores, onCancel, onComplete }: Props) => {
+const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, feats = [], abilityScores, onCancel, onComplete }: Props) => {
   const { classes } = useCharClasses();
+  const { feats: catalog } = useFeats();
+  const { user } = useAuth();
 
   type Step = 'choose-class' | 'hp' | 'subclass' | 'asi' | 'review';
   const [step, setStep] = useState<Step>('choose-class');
@@ -42,7 +54,9 @@ const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abil
   const [rollMethod, setRollMethod] = useState<'roll' | 'average'>('average');
   const [rolledValue, setRolledValue] = useState<number | null>(null);
   const [subclassIndex, setSubclassIndex] = useState<string | null>(null);
-  const [asiChoice, setAsiChoice] = useState<'none' | 'single' | 'double'>('none');
+  const [asiChoice, setAsiChoice] = useState<'none' | 'single' | 'double' | 'feat'>('none');
+  const [featIndex, setFeatIndex] = useState<string>('');
+  const [featAbility, setFeatAbility] = useState<AbilityKey | null>(null);
   const [singleAbility, setSingleAbility] = useState<AbilityKey>('strength');
   const [doubleAbilities, setDoubleAbilities] = useState<AbilityKey[]>([]);
 
@@ -57,7 +71,13 @@ const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abil
   const conMod = getModifier(abilityScores.constitution);
   const averageRoll = Math.floor(hitDie / 2) + 1;
   const baseRoll = rollMethod === 'roll' ? (rolledValue ?? averageRoll) : averageRoll;
-  const hpGained = Math.max(1, baseRoll + conMod);
+  const chosenFeat = asiChoice === 'feat' ? catalog.find((f) => f.index === featIndex) : undefined;
+  const featAbilityKeys = (chosenFeat?.ability_options || []).map((a) => ABILITY_SHORT_TO_KEY[a]).filter(Boolean) as AbilityKey[];
+  // Tough: +2 per level, applied to this level if already owned, or to every
+  // level when it is taken now.
+  const hasTough = feats.some((f) => f.index === 'tough');
+  const toughBonus = hasTough ? 2 : chosenFeat?.index === 'tough' ? 2 * newTotalLevel : 0;
+  const hpGained = Math.max(1, baseRoll + conMod) + toughBonus;
 
   const reroll = () => setRolledValue(Math.floor(Math.random() * hitDie) + 1);
 
@@ -68,7 +88,8 @@ const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abil
   const effectiveSubclassIndex = subclassIndex || alreadyChosenSubclass;
 
   const levelData = selectedClass?.levels.find((l) => l.level === newClassLevel);
-  const isAsiLevel = !!levelData && levelData.ability_score_bonuses > 0;
+  // ability_score_bonuses is a running total, so compare with the previous level.
+  const isAsiLevel = !!levelData && !!selectedClass && classAsiLevel(selectedClass, newClassLevel);
 
   const abilityChanges: Partial<Record<AbilityKey, number>> = useMemo(() => {
     if (asiChoice === 'single') return { [singleAbility]: 2 };
@@ -77,8 +98,9 @@ const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abil
       doubleAbilities.forEach((k) => { changes[k] = (changes[k] || 0) + 1; });
       return changes;
     }
+    if (asiChoice === 'feat' && featAbility) return { [featAbility]: 1 };
     return {};
-  }, [asiChoice, singleAbility, doubleAbilities]);
+  }, [asiChoice, singleAbility, doubleAbilities, featAbility]);
 
   const toggleDoubleAbility = (key: AbilityKey) => {
     setDoubleAbilities((prev) => {
@@ -97,6 +119,8 @@ const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abil
     setAsiChoice('none');
     setSingleAbility('strength');
     setDoubleAbilities([]);
+    setFeatIndex('');
+    setFeatAbility(null);
     setError('');
   };
 
@@ -133,6 +157,7 @@ const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abil
         hp_gained: hpGained,
         subclass_index: subclassIndex || undefined,
         ability_score_changes: abilityChanges,
+        feat: chosenFeat ? { index: chosenFeat.index, ability: featAbility ? ABILITY_KEY_TO_SHORT[featAbility] : undefined } : undefined,
       });
       onComplete(res.data);
       reset();
@@ -143,11 +168,11 @@ const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abil
     }
   };
 
-  const untaken = classes.filter((c) => !takenIndexes.includes(c.index));
+  const untaken = classes.filter((c) => !takenIndexes.includes(c.index) && isSelectableBy(c, user?.id));
   const takenClasses = classSummaries.filter((s) => s.char_class_index);
 
   return (
-    <Modal isOpen={isOpen} toggle={handleCancel}>
+    <Modal isOpen={isOpen} toggle={handleCancel} scrollable fullscreen="sm" contentClassName="theme-modal">
       <ModalHeader toggle={handleCancel}>
         Level Up — {currentLevel} → {newTotalLevel}
       </ModalHeader>
@@ -168,6 +193,7 @@ const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abil
                       className="btn btn-outline-secondary btn-sm text-start"
                       onClick={() => selectClass(s.char_class_index as string)}
                     >
+                      {cls && <ClassIcon iconKey={classIconKey(cls)} size="1.2rem" className="me-2" />}
                       {cls?.name || s.char_class_name} — currently level {s.level}
                       {s.subclass_index && cls ? ` (${cls.subclasses.find((sc) => sc.index === s.subclass_index)?.name})` : ''}
                     </button>
@@ -188,7 +214,8 @@ const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abil
                       className="btn btn-outline-secondary btn-sm"
                       onClick={() => selectClass(c.index)}
                     >
-                      {c.name} (d{c.hit_die})
+                      <ClassIcon iconKey={classIconKey(c)} size="1.1rem" className="me-1" />
+                      {c.name} (d{c.hit_die}){c.homebrew ? ' · Homebrew' : ''}
                     </button>
                   ))}
                 </div>
@@ -245,6 +272,7 @@ const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abil
                   onClick={() => setSubclassIndex(sc.index)}
                 >
                   <strong>{sc.name}</strong>
+                  <span style={{ fontSize: '0.7rem', opacity: 0.7, marginLeft: '0.4rem' }}>{sc.source || 'SRD'}</span>
                   {sc.desc[0] && (
                     <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: '0.15rem' }}>
                       {sc.desc[0].slice(0, 140)}{sc.desc[0].length > 140 ? '…' : ''}
@@ -279,12 +307,58 @@ const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abil
               </button>
               <button
                 type="button"
-                className={`btn btn-sm ${asiChoice === 'none' ? 'btn-theme-primary' : 'btn-outline-secondary'}`}
-                onClick={() => setAsiChoice('none')}
+                className={`btn btn-sm ${asiChoice === 'feat' ? 'btn-theme-primary' : 'btn-outline-secondary'}`}
+                onClick={() => setAsiChoice('feat')}
               >
-                Skip (taking a feat instead)
+                Take a feat
               </button>
             </div>
+
+            {asiChoice === 'feat' && (
+              <div className="mb-2">
+                <select
+                  className="form-select input-theme"
+                  value={featIndex}
+                  onChange={(e) => {
+                    setFeatIndex(e.target.value);
+                    const next = catalog.find((f) => f.index === e.target.value);
+                    const first = (next?.ability_options || []).map((a) => ABILITY_SHORT_TO_KEY[a]).find(Boolean);
+                    setFeatAbility(first || null);
+                  }}
+                  aria-label="Choose a feat"
+                >
+                  <option value="">Choose a feat…</option>
+                  {catalog.map((f) => (
+                    <option key={f.index} value={f.index} disabled={feats.some((t) => t.index === f.index)}>
+                      {f.name}{f.ability_bonus ? ' (+1)' : ''}{f.source ? ` · ${f.source}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {chosenFeat && (
+                  <div className="mt-2" style={{ fontSize: '0.82rem' }}>
+                    <p className="text-theme mb-1">{chosenFeat.desc[0]}</p>
+                    {chosenFeat.prerequisite && <p className="text-muted-theme mb-1">Requires {chosenFeat.prerequisite}</p>}
+                    {featAbilityKeys.length > 0 && (
+                      <div className="d-flex flex-wrap gap-2 align-items-center">
+                        <span className="text-muted-theme">+1 to</span>
+                        {featAbilityKeys.map((k) => (
+                          <button
+                            key={k}
+                            type="button"
+                            className={`btn btn-sm ${featAbility === k ? 'btn-theme-primary' : 'btn-outline-secondary'}`}
+                            onClick={() => setFeatAbility(k)}
+                            disabled={abilityScores[k] >= 20}
+                          >
+                            {ABILITY_SCORES.find((a) => a.key === k)?.label} ({abilityScores[k]} → {Math.min(20, abilityScores[k] + 1)})
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {chosenFeat.index === 'tough' && <p className="text-muted-theme mt-1 mb-0">Adds {2 * newTotalLevel} HP now (+2 every level after).</p>}
+                  </div>
+                )}
+              </div>
+            )}
 
             {asiChoice === 'single' && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
@@ -343,9 +417,8 @@ const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abil
                   {ABILITY_SCORES.find((a) => a.key === key)?.label}: {abilityScores[key as AbilityKey]} → {abilityAfter(key as AbilityKey)}
                 </li>
               ))}
-              {Object.keys(abilityChanges).length === 0 && isAsiLevel && (
-                <li>Ability Score Improvement skipped (feat)</li>
-              )}
+              {chosenFeat && <li>Feat: {chosenFeat.name}</li>}
+              {toughBonus > 0 && <li>Tough: +{toughBonus} HP included</li>}
             </ul>
 
             {grantedFeatures.length > 0 && (
@@ -364,6 +437,14 @@ const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abil
                   ))}
                 </div>
               </>
+            )}
+
+            {selectedClass && classResources(selectedClass, newClassLevel).length > 0 && (
+              <div className="d-flex flex-wrap gap-2 mt-3" style={{ fontSize: '0.8rem' }}>
+                {classResources(selectedClass, newClassLevel).map((r) => (
+                  <span key={r.label} className="badge-cls">{r.label}: {r.value}</span>
+                ))}
+              </div>
             )}
 
             {newSlots && (
@@ -428,7 +509,11 @@ const LevelUpWizard = ({ isOpen, characterId, currentLevel, classSummaries, abil
             type="button"
             className="btn btn-theme-primary btn-sm"
             onClick={() => setStep('review')}
-            disabled={asiChoice === 'double' && doubleAbilities.length !== 2}
+            disabled={
+              asiChoice === 'none' ||
+              (asiChoice === 'double' && doubleAbilities.length !== 2) ||
+              (asiChoice === 'feat' && !chosenFeat)
+            }
           >
             Next
           </button>

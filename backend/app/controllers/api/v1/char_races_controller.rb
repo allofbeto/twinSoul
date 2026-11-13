@@ -1,14 +1,12 @@
 class Api::V1::CharRacesController < ApplicationController
-  include Authenticatable
+  include HomebrewCrud
 
-  def index
-    render json: CharRace.where(game: params[:game] || 'dnd_5e').order(:name), status: :ok
-  end
+  private
 
-  def show
-    char_race = CharRace.find_by!(index: params[:id], game: params[:game] || 'dnd_5e')
-    render json: char_race, status: :ok
-  rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Race not found' }, status: :not_found
+  def model = CharRace
+  def label = 'Race'
+
+  def normalized_attributes
+    HomebrewNormalizer.race_attributes(params.fetch(:char_race, params).to_unsafe_h)
   end
 end

@@ -1,15 +1,19 @@
 import React from 'react';
 import { useCharClasses, findCharClass } from '../useCharClasses';
-import { ABILITY_INDEX_TO_KEY, CharacterClassSummary, spellSlotsAt } from '../classTypes';
+import { ABILITY_INDEX_TO_KEY, CharacterClassSummary, classResources, spellSlotsAt } from '../classTypes';
+import { CharacterFeat, useFeats } from '../featTypes';
+import ClassIcon, { classIconKey } from './ClassIcon';
 
 interface Props {
   classSummaries: CharacterClassSummary[];
+  feats?: CharacterFeat[];
 }
 
 const SLOT_LABELS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-const ClassFeatures = ({ classSummaries }: Props) => {
+const ClassFeatures = ({ classSummaries, feats = [] }: Props) => {
   const { classes, loading } = useCharClasses();
+  const { feats: catalog } = useFeats();
 
   const withData = classSummaries.filter((s) => s.char_class_index);
 
@@ -39,7 +43,8 @@ const ClassFeatures = ({ classSummaries }: Props) => {
 
         return (
           <div key={s.id}>
-            <h6 className="text-theme mb-1">
+            <h6 className="text-theme mb-1 d-flex align-items-center gap-2">
+              <ClassIcon iconKey={classIconKey(cls)} size="1.4rem" />
               {cls.name} {s.level}{subclass ? ` — ${subclass.name}` : ''}
             </h6>
             <p className="text-muted-theme mb-2" style={{ fontSize: '0.8rem' }}>
@@ -49,6 +54,14 @@ const ClassFeatures = ({ classSummaries }: Props) => {
               )}
               {cls.spellcasting_ability && <> · Spellcasting: {(ABILITY_INDEX_TO_KEY[cls.spellcasting_ability] || cls.spellcasting_ability)}</>}
             </p>
+
+            {classResources(cls, s.level).length > 0 && (
+              <div className="d-flex flex-wrap gap-2 mb-2">
+                {classResources(cls, s.level).map((r) => (
+                  <span key={r.label} className="badge-cls">{r.label}: {r.value}</span>
+                ))}
+              </div>
+            )}
 
             {slots && (
               <div className="d-flex flex-wrap gap-2 mb-2">
@@ -88,6 +101,28 @@ const ClassFeatures = ({ classSummaries }: Props) => {
           </div>
         );
       })}
+
+      {feats.length > 0 && (
+        <div>
+          <h6 className="text-theme mb-2">Feats</h6>
+          <div className="d-flex flex-column gap-1">
+            {feats.map((ft, i) => {
+              const info = catalog.find((c) => c.index === ft.index);
+              return (
+                <details key={`${ft.index}-${i}`} style={{ fontSize: '0.82rem' }}>
+                  <summary className="text-theme" style={{ cursor: 'pointer' }}>
+                    {ft.taken_at && <span className="text-muted-theme">{ft.taken_at}</span>} {ft.name}
+                    {ft.ability && <span className="text-muted-theme"> (+1 {ft.ability.toUpperCase()})</span>}
+                  </summary>
+                  {info?.desc.map((d, n) => (
+                    <p key={n} className="text-muted-theme" style={{ fontSize: '0.78rem', marginLeft: '0.5rem' }}>{d}</p>
+                  ))}
+                </details>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useCharClasses, findCharClass } from '../useCharClasses';
 import { CharacterClassSummary } from '../classTypes';
 import { addCharacterClass, removeCharacterClass, updateCharacterClass } from '../../../../api/backendHelpers';
+import { isSelectableBy } from '../referenceCache';
+import { useAuth } from '../../../../context/AuthContext';
 
 interface Props {
   characterId: string;
@@ -13,6 +15,7 @@ interface Props {
 
 const ClassManager = ({ characterId, classSummaries, legacyClasses, isOwner, onCharacterUpdated }: Props) => {
   const { classes } = useCharClasses();
+  const { user } = useAuth();
   const [adding, setAdding] = useState(false);
   const [newClassIndex, setNewClassIndex] = useState('');
   const [newLevel, setNewLevel] = useState(1);
@@ -21,7 +24,7 @@ const ClassManager = ({ characterId, classSummaries, legacyClasses, isOwner, onC
   const [busy, setBusy] = useState(false);
 
   const takenIndexes = classSummaries.filter((s) => s.char_class_index).map((s) => s.char_class_index as string);
-  const available = classes.filter((c) => !takenIndexes.includes(c.index));
+  const available = classes.filter((c) => !takenIndexes.includes(c.index) && isSelectableBy(c, user?.id));
   const newClassData = findCharClass(classes, newClassIndex || undefined);
   const showSubclassField = !!(newClassData?.subclass_choice_level && newLevel >= newClassData.subclass_choice_level);
 
@@ -149,7 +152,7 @@ const ClassManager = ({ characterId, classSummaries, legacyClasses, isOwner, onC
             >
               <option value="">Select class...</option>
               {available.map((c) => (
-                <option key={c.index} value={c.index}>{c.name} (d{c.hit_die})</option>
+                <option key={c.index} value={c.index}>{c.name} (d{c.hit_die}){c.homebrew ? ' · Homebrew' : ''}</option>
               ))}
             </select>
             <div className="d-flex gap-2 align-items-center">

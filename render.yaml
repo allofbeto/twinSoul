@@ -36,3 +36,8 @@ services:
       # adapter work. Raise it only after adding Redis (REDIS_URL).
       - key: WEB_CONCURRENCY
         value: "0"
+      # Claude API key for "import homebrew from a URL". Set it in the Render
+      # dashboard; without it the import button explains it's unavailable and
+      # players build homebrew by hand.
+      - key: ANTHROPIC_API_KEY
+        sync: false

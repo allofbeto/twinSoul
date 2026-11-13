@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import SkillSelector from './SkillSelector';
+import LanguagesPanel from './LanguagesPanel';
 import InventoryTable from './InventoryTable';
 import ClassFeatures from './ClassFeatures';
+import { CharacterFeat } from '../featTypes';
 import { CharacterClassSummary } from '../classTypes';
 
 type Tab = 'skills' | 'features' | 'inventory' | 'notes';
 
 interface Props {
   skills: string[];
+  languages?: string[];
+  onLanguagesChange?: (languages: string[]) => void;
   onToggleSkill: (skill: string) => void;
   abilityScores: {
     strength: number;
@@ -20,6 +24,7 @@ interface Props {
   proficiencyBonus: number;
   characterId: string;
   classSummaries: CharacterClassSummary[];
+  feats?: CharacterFeat[];
   supportsClasses: boolean;
   isOwner: boolean;
 }
@@ -31,7 +36,7 @@ const ALL_TABS: { key: Tab; label: string }[] = [
   { key: 'notes', label: 'Notes' },
 ];
 
-const TabbedPanel = ({ skills, onToggleSkill, abilityScores, proficiencyBonus, characterId, classSummaries, supportsClasses, isOwner }: Props) => {
+const TabbedPanel = ({ skills, languages = [], onLanguagesChange, onToggleSkill, abilityScores, proficiencyBonus, characterId, classSummaries, feats = [], supportsClasses, isOwner }: Props) => {
   const [activeTab, setActiveTab] = useState<Tab>('skills');
   const TABS = ALL_TABS.filter((t) => t.key !== 'features' || supportsClasses);
 
@@ -52,16 +57,19 @@ const TabbedPanel = ({ skills, onToggleSkill, abilityScores, proficiencyBonus, c
 
       <div className="p-3">
         {activeTab === 'skills' && (
-          <SkillSelector
-            selected={skills}
-            onToggle={onToggleSkill}
-            abilityScores={abilityScores}
-            proficiencyBonus={proficiencyBonus}
-            isOwner={isOwner}
-          />
+          <>
+            <SkillSelector
+              selected={skills}
+              onToggle={onToggleSkill}
+              abilityScores={abilityScores}
+              proficiencyBonus={proficiencyBonus}
+              isOwner={isOwner}
+            />
+            {onLanguagesChange && <LanguagesPanel languages={languages} onChange={onLanguagesChange} isOwner={isOwner} />}
+          </>
         )}
         {activeTab === 'features' && (
-          <ClassFeatures classSummaries={classSummaries} />
+          <ClassFeatures classSummaries={classSummaries} feats={feats} />
         )}
         {activeTab === 'inventory' && (
           <InventoryTable characterId={characterId} />

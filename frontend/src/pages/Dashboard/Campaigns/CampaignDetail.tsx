@@ -6,8 +6,11 @@ import CampaignPlayers from './Components/CampaignPlayers';
 import CampaignSessions from './Components/CampaignSessions';
 import CampaignItems from './Components/CampaignItems';
 import CampaignSoundtrack from './Components/CampaignSoundtrack';
+import CampaignHomebrew from './Components/CampaignHomebrew';
+import { getHomebrewReviews } from '../../../api/backendHelpers';
 import { campaignColor } from '../../../utils/campaignColor';
 import '../../../styles/campaignColor.css';
+import '../../../styles/homebrew.css';
 
 interface Campaign {
   id: string;
@@ -33,11 +36,12 @@ interface Player {
   user_id: string;
 }
 
-type Tab = 'overview' | 'players' | 'sessions' | 'items' | 'soundtrack';
+type Tab = 'overview' | 'players' | 'homebrew' | 'sessions' | 'items' | 'soundtrack';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
   { key: 'players', label: 'Players' },
+  { key: 'homebrew', label: 'Homebrew' },
   { key: 'sessions', label: 'Sessions' },
   { key: 'items', label: 'Items' },
   { key: 'soundtrack', label: 'Soundtrack' },
@@ -54,6 +58,13 @@ const CampaignDetail = () => {
   const [form, setForm] = useState<Campaign | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [pendingHomebrew, setPendingHomebrew] = useState(0);
+
+  useEffect(() => {
+    getHomebrewReviews(id!)
+      .then((res) => setPendingHomebrew(res.data.filter((c: { homebrew_status: string }) => c.homebrew_status === 'pending').length))
+      .catch(() => {});
+  }, [id]);
 
   useEffect(() => {
     const fetch = async () => {
@@ -140,6 +151,9 @@ const CampaignDetail = () => {
                 onClick={() => setActiveTab(tab.key)}
               >
                 {tab.label}
+                {tab.key === 'homebrew' && pendingHomebrew > 0 && (
+                  <span className="tab-count" aria-label={`${pendingHomebrew} awaiting review`}>{pendingHomebrew}</span>
+                )}
               </button>
             ))}
           </div>
@@ -164,6 +178,9 @@ const CampaignDetail = () => {
           players={players}
           setPlayers={setPlayers}
         />
+      )}
+      {activeTab === 'homebrew' && (
+        <CampaignHomebrew campaignId={id!} onPendingCountChange={setPendingHomebrew} />
       )}
       {activeTab === 'sessions' && (
         <CampaignSessions campaignId={id!} />

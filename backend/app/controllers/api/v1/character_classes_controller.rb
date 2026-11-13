@@ -8,7 +8,7 @@ class Api::V1::CharacterClassesController < ApplicationController
 
     if character_class.save
       character.update!(level: character.character_classes.sum(:level))
-      render json: character.as_json(methods: [:classes, :character_class_summaries]), status: :created
+      render json: character.as_json(methods: [:classes, :character_class_summaries, :homebrew_summary]), status: :created
     else
       render json: { errors: character_class.errors.full_messages }, status: :unprocessable_entity
     end
@@ -22,7 +22,7 @@ class Api::V1::CharacterClassesController < ApplicationController
 
     if character_class.update(character_class_params(character.game))
       character.update!(level: character.character_classes.sum(:level))
-      render json: character.as_json(methods: [:classes, :character_class_summaries]), status: :ok
+      render json: character.as_json(methods: [:classes, :character_class_summaries, :homebrew_summary]), status: :ok
     else
       render json: { errors: character_class.errors.full_messages }, status: :unprocessable_entity
     end
@@ -35,7 +35,7 @@ class Api::V1::CharacterClassesController < ApplicationController
     character_class = character.character_classes.find(params[:id])
     character_class.destroy
     character.update!(level: [character.character_classes.sum(:level), 1].max)
-    render json: character.as_json(methods: [:classes, :character_class_summaries]), status: :ok
+    render json: character.as_json(methods: [:classes, :character_class_summaries, :homebrew_summary]), status: :ok
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Character class not found' }, status: :not_found
   end
@@ -46,7 +46,7 @@ class Api::V1::CharacterClassesController < ApplicationController
     permitted = params.permit(:level, :subclass_index, :char_class_index, :custom_name).to_h
     if permitted.key?('char_class_index')
       idx = permitted.delete('char_class_index')
-      permitted['char_class_id'] = idx.present? ? CharClass.find_by(index: idx, game: game)&.id : nil
+      permitted['char_class_id'] = idx.present? ? CharClass.selectable_by(@current_user).find_by(index: idx, game: game)&.id : nil
     end
     permitted
   end

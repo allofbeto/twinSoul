@@ -26,7 +26,7 @@ const GameSystemPicker = ({ onSelect }: Props) => {
               {!g.enabled && (
                 <span
                   className="badge-cls"
-                  style={{ position: 'absolute', top: '1rem', right: '1rem', fontSize: '0.7rem' }}
+                  style={{ display: 'inline-block', marginBottom: '0.5rem', fontSize: '0.7rem' }}
                 >
                   Coming soon
                 </span>

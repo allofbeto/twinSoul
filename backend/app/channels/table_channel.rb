@@ -68,7 +68,8 @@ class TableChannel < ApplicationCable::Channel
       campaign = Campaign.find(params[:campaign_id])
       return unless member?(campaign)
 
-      character = Character.find_by(id: data['character_id'], user_id: current_user.id, campaign_id: campaign.id)
+      # Characters with homebrew the DM hasn't approved can't join the table yet.
+      character = Character.playable.find_by(id: data['character_id'], user_id: current_user.id, campaign_id: campaign.id)
       return unless character
 
       TableChannel.broadcast_to(campaign, {

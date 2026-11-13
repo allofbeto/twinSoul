@@ -1,25 +1,59 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createCharacter } from '../../../../api/backendHelpers';
+import { createCharacter, createImageAsset } from '../../../../api/backendHelpers';
 import { useCharClasses, findCharClass } from '../useCharClasses';
 import { useCharRaces, findCharRace } from '../useCharRaces';
-import { ABILITY_INDEX_TO_KEY, getClassAuraHue } from '../classTypes';
-import { ABILITY_SCORES, DND_SKILLS } from '../constants';
+import { getClassAuraHue, CharClass, asiLevelsUpTo, classResources, getFeaturesGainedAt, requiresSubclassChoiceAt } from '../classTypes';
+import { raceIconKey } from '../raceTypes';
+import { toughHpBonus, useFeats } from '../featTypes';
+import ClassIcon, { classIconKey } from '../Components/ClassIcon';
 import RaceIconPicker from '../Components/RaceIconPicker';
+import RaceIcon from '../Components/RaceIcon';
 import CharacterAura from '../Components/CharacterAura';
+import HomebrewModal from '../homebrew/HomebrewModal';
+import { isSelectableBy } from '../referenceCache';
+import { useAuth } from '../../../../context/AuthContext';
+import AbilityStep, { RollResult, ScoreMethod } from './AbilityStep';
+import AsiStep from './AsiStep';
+import BackgroundStep from './BackgroundStep';
+import TalentsStep from './TalentsStep';
+import { findBackground } from './backgrounds';
+import { buildLanguageSources, buildSkillSources, sanitizeLanguagePicks, sanitizePicks } from './skillSources';
+import {
+  ABILITY_KEYS,
+  ABILITY_META,
+  AbilityKey,
+  AsiChoice,
+  ClassPick,
+  Scores,
+  abilityKeyFromShort,
+  asiBonuses,
+  asiIsComplete,
+  blankAsi,
+  classFlavor,
+  combinedPrimary,
+  modifier,
+  multiclassHp,
+  multiclassRequirement,
+  raceBonusChoice,
+  signed,
+  suggestName,
+  suggestedArray,
+  totalLevel,
+} from './builderData';
 import '../../../../styles/characterCreation.css';
+import '../../../../styles/homebrew.css';
 
-type Step = 'basics' | 'class' | 'abilities' | 'skills' | 'review';
+type Step = 'origin' | 'calling' | 'might' | 'past' | 'talents' | 'legend';
 
-const STEPS: { key: Step; label: string }[] = [
-  { key: 'basics', label: 'Name & Race' },
-  { key: 'class', label: 'Class' },
-  { key: 'abilities', label: 'Ability Scores' },
-  { key: 'skills', label: 'Skills' },
-  { key: 'review', label: 'Review' },
+const STEPS: { key: Step; label: string; title: string; prompt: string }[] = [
+  { key: 'origin', label: 'Origin', title: 'Where do you come from?', prompt: 'Your people shape your body, senses and gifts.' },
+  { key: 'calling', label: 'Calling', title: 'What is your calling?', prompt: 'Your class is how you face the dangers ahead.' },
+  { key: 'might', label: 'Might', title: 'Where does your strength lie?', prompt: 'Six abilities define what you do best and where you struggle.' },
+  { key: 'past', label: 'Past', title: 'What did you do before?', prompt: 'Your background is the life you led before adventure found you.' },
+  { key: 'talents', label: 'Talents', title: 'What have you learned?', prompt: 'Skills and languages from your people, your past and every class you follow.' },
+  { key: 'legend', label: 'Legend', title: 'Who are you?', prompt: 'Every legend starts with a name.' },
 ];
-
-const getModifier = (score: number) => Math.floor((score - 10) / 2);
 
 interface Props {
   onBack: () => void;
@@ -27,428 +61,657 @@ interface Props {
 
 const Dnd5eCharacterWizard = ({ onBack }: Props) => {
   const navigate = useNavigate();
-  const { classes: charClasses } = useCharClasses('dnd_5e');
+  const { user } = useAuth();
+  const { classes: allClasses, loading: classesLoading } = useCharClasses('dnd_5e');
+  const charClasses = allClasses.filter((c) => isSelectableBy(c, user?.id));
   const { races: charRaces } = useCharRaces('dnd_5e');
-  const [step, setStep] = useState<Step>('basics');
+  const { feats: featCatalog } = useFeats('dnd_5e');
+
+  const [step, setStepRaw] = useState<Step>('origin');
+  const [visited, setVisited] = useState<Set<Step>>(() => new Set<Step>(['origin']));
+  const setStep = (next: Step) => {
+    setStepRaw(next);
+    setVisited((v) => new Set(v).add(next));
+  };
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [charClassIndex, setCharClassIndex] = useState('');
-  const [subclassIndex, setSubclassIndex] = useState('');
+  const [forging, setForging] = useState(false);
+  const [classEditor, setClassEditor] = useState<{ open: boolean; existing: CharClass | null }>({ open: false, existing: null });
+
   const [raceIndex, setRaceIndex] = useState('');
   const [subraceIndex, setSubraceIndex] = useState('');
-  const [hpTouched, setHpTouched] = useState(false);
-  const [abilitiesTouched, setAbilitiesTouched] = useState(false);
-  const [form, setForm] = useState({
-    name: '',
-    race: '',
-    level: 1,
-    max_hp: 0,
-    current_hp: 0,
-    armor_class: 10,
-    strength: 10,
-    dexterity: 10,
-    constitution: 10,
-    intelligence: 10,
-    wisdom: 10,
-    charisma: 10,
-    skills: [] as string[],
-  });
+  const [raceLabel, setRaceLabel] = useState('');
+  // Chosen classes, starting class first, each with its own level.
+  const [picks, setPicks] = useState<ClassPick[]>([]);
+  const [method, setMethod] = useState<ScoreMethod>('custom');
+  const [base, setBase] = useState<Scores>(() => suggestedArray(undefined));
+  const [scoresArranged, setScoresArranged] = useState(false);
+  const [rolls, setRolls] = useState<RollResult[] | null>(null);
+  const [chosenBonuses, setChosenBonuses] = useState<(AbilityKey | null)[]>([]);
+  const [backgroundIndex, setBackgroundIndex] = useState('');
+  const [customBackground, setCustomBackground] = useState('');
+  // Chosen skills per source (starting class, race, background, multiclass…).
+  const [skillPicks, setSkillPicks] = useState<Record<string, string[]>>({});
+  const [languagePicks, setLanguagePicks] = useState<Record<string, string[]>>({});
+  // Choices for each Ability Score Improvement, keyed by "class-level".
+  const [asiState, setAsiState] = useState<Record<string, AsiChoice>>({});
+  const [name, setName] = useState('');
+  // Optional portrait from a link; checked by actually loading it.
+  const [portraitUrl, setPortraitUrl] = useState('');
+  const [portraitStatus, setPortraitStatus] = useState<'empty' | 'loading' | 'ok' | 'error'>('empty');
+  const portrait = portraitUrl.trim();
+  const portraitLooksValid = /^https?:\/\/\S+$/i.test(portrait);
+  useEffect(() => {
+    if (!portrait) return setPortraitStatus('empty');
+    if (!portraitLooksValid) return setPortraitStatus('error');
+    setPortraitStatus('loading');
+    let alive = true;
+    const img = new Image();
+    img.onload = () => alive && setPortraitStatus('ok');
+    img.onerror = () => alive && setPortraitStatus('error');
+    img.src = portrait;
+    return () => {
+      alive = false;
+    };
+  }, [portrait, portraitLooksValid]);
 
-  const selectedClass = findCharClass(charClasses, charClassIndex || undefined);
-  const showSubclassField = !!(selectedClass?.subclass_choice_level && form.level >= selectedClass.subclass_choice_level);
-  const conMod = getModifier(form.constitution);
-  const suggestedHp = selectedClass ? selectedClass.hit_die + conMod : null;
-  const selectedSubclass = selectedClass?.subclasses.find((s) => s.index === subclassIndex);
+  const race = findCharRace(charRaces, raceIndex || undefined);
+  const subrace = race?.subraces.find((s) => s.index === subraceIndex);
+  const chosen = picks
+    .map((p) => ({ pick: p, cls: findCharClass(charClasses, p.index) }))
+    .filter((c): c is { pick: ClassPick; cls: CharClass } => !!c.cls);
+  const cls = chosen[0]?.cls; // starting class: saves, skills, first-level HP
+  const classIndex = picks[0]?.index || '';
+  const level = Math.max(1, totalLevel(picks));
+  const levelsLeft = 20 - totalLevel(picks);
+  const isMulticlass = chosen.length > 1;
+  const primaryAbilities = combinedPrimary(chosen.map((c) => c.cls));
+  const classSummary = chosen
+    .map(({ pick, cls: c }) => {
+      const sub = c.subclasses.find((s) => s.index === pick.subclassIndex);
+      return `${c.name}${sub ? ` (${sub.name})` : ''} ${pick.level}`;
+    })
+    .join(' / ');
+  const shortClassSummary = chosen.map(({ pick, cls: c }) => `${c.name} ${pick.level}`).join(' / ');
 
-  const selectedRace = findCharRace(charRaces, raceIndex || undefined);
-  const selectedSubrace = selectedRace?.subraces.find((s) => s.index === subraceIndex);
-  const raceBonuses = [
-    ...(selectedRace?.ability_bonuses || []),
-    ...(selectedSubrace?.ability_bonuses || []),
-  ];
-
-  const applyRaceBonuses = () => {
-    if (raceBonuses.length === 0) return;
-    const updated = { ...form };
-    raceBonuses.forEach((b) => {
-      const key = ABILITY_INDEX_TO_KEY[b.ability_score];
-      if (key) (updated as any)[key] = Math.min(20, (updated as any)[key] + b.bonus);
+  const asiChoices: AsiChoice[] = chosen.flatMap(({ pick, cls: c }) =>
+    asiLevelsUpTo(c, pick.level).map((lvl) => asiState[`${c.index}-${lvl}`] || blankAsi(c.index, c.name, lvl)),
+  );
+  const setAsiChoices = (next: AsiChoice[]) =>
+    setAsiState((current) => ({ ...current, ...Object.fromEntries(next.map((a) => [a.key, a])) }));
+  const takenFeats = asiChoices
+    .filter((a) => a.kind === 'feat' && a.featIndex)
+    .map((a) => {
+      const feat = featCatalog.find((f) => f.index === a.featIndex);
+      return {
+        index: a.featIndex as string,
+        name: feat?.name || (a.featIndex as string),
+        ability: a.featAbility ? ABILITY_META[a.featAbility].short.toLowerCase() : undefined,
+        taken_at: `${a.className} ${a.classLevel}`,
+      };
     });
-    setForm(updated);
-    setAbilitiesTouched(true);
+  const subclassMissing = chosen.filter(({ pick, cls: c }) => requiresSubclassChoiceAt(c, pick.level) && !pick.subclassIndex);
+
+  const addClass = (index: string) =>
+    setPicks((current) =>
+      current.some((p) => p.index === index) || totalLevel(current) >= 20
+        ? current
+        : [...current, { index, level: 1, subclassIndex: '' }],
+    );
+  const updatePick = (index: string, patch: Partial<ClassPick>) =>
+    setPicks((current) => current.map((p) => (p.index === index ? { ...p, ...patch } : p)));
+  const removePick = (index: string) => setPicks((current) => current.filter((p) => p.index !== index));
+  const setPickLevel = (index: string, next: number) => {
+    const pick = picks.find((p) => p.index === index);
+    if (!pick) return;
+    const capped = Math.max(1, Math.min(next, pick.level + levelsLeft));
+    const c = findCharClass(charClasses, index);
+    // Dropping below the subclass level clears the subclass.
+    const keepSub = !!c?.subclass_choice_level && capped >= c.subclass_choice_level;
+    updatePick(index, { level: capped, subclassIndex: keepSub ? pick.subclassIndex : '' });
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.name === 'max_hp' || e.target.name === 'current_hp') setHpTouched(true);
-    setForm({ ...form, [e.target.name]: parseInt(e.target.value) || 0 });
-  };
-
-  const applySuggestedHp = () => {
-    if (suggestedHp === null) return;
-    const hp = Math.max(1, suggestedHp);
-    setForm({ ...form, max_hp: hp, current_hp: hp });
-    setHpTouched(true);
-  };
-
-  const toggleSkill = (skill: string) => {
-    setForm({
-      ...form,
-      skills: form.skills.includes(skill)
-        ? form.skills.filter((s) => s !== skill)
-        : [...form.skills, skill],
+  const fixedBonuses = useMemo(() => {
+    const out: Partial<Record<AbilityKey, number>> = {};
+    [...(race?.ability_bonuses || []), ...(subrace?.ability_bonuses || [])].forEach((b) => {
+      const key = abilityKeyFromShort(b.ability_score);
+      if (key) out[key] = (out[key] || 0) + b.bonus;
     });
-  };
+    return out;
+  }, [race, subrace]);
+  const bonusChoice = raceBonusChoice(race);
+
+  const asiKey = JSON.stringify(asiChoices);
+  const finalScores = useMemo(() => {
+    const out = { ...base };
+    const improvements = asiBonuses(JSON.parse(asiKey) as AsiChoice[]);
+    ABILITY_KEYS.forEach((k) => {
+      let score = base[k] + (fixedBonuses[k] || 0) + (improvements[k] || 0);
+      bonusChoice?.amounts.forEach((amt, i) => { if (chosenBonuses[i] === k) score += amt; });
+      out[k] = Math.max(1, Math.min(20, score));
+    });
+    return out;
+  }, [base, fixedBonuses, bonusChoice, chosenBonuses, asiKey]);
+
+  const hp =
+    multiclassHp(chosen.map((c) => ({ cls: c.cls, level: c.pick.level })), modifier(finalScores.constitution)) +
+    toughHpBonus(takenFeats, level);
+  const ac = 10 + modifier(finalScores.dexterity);
+  const background = findBackground(backgroundIndex);
+  const backgroundName = background?.index === 'custom' ? customBackground.trim() || 'Custom' : background?.name;
+  const { granted, pools } = buildSkillSources({ race, subrace, background, classes: chosen.map((c) => c.cls) });
+  const picksBySource = sanitizePicks(skillPicks, granted, pools);
+  const skills = [...granted.map((g) => g.skill), ...pools.flatMap((p) => picksBySource[p.key])];
+  const skillsToChoose = pools.reduce((n, p) => n + p.choose, 0);
+  const skillsChosen = pools.reduce((n, p) => n + picksBySource[p.key].length, 0);
+  const langSources = buildLanguageSources({ race, subrace, background, classes: chosen.map((c) => c.cls) });
+  const languagePicksBySource = sanitizeLanguagePicks(languagePicks, langSources.known, langSources.pools);
+  const languages = [...langSources.known.map((k) => k.language), ...langSources.pools.flatMap((p) => languagePicksBySource[p.key])];
+  const languagesToChoose = langSources.pools.reduce((n, p) => n + p.choose, 0);
+  const languagesChosen = langSources.pools.reduce((n, p) => n + languagePicksBySource[p.key].length, 0);
+  // Multiclassing needs the ability minimums of every class taken.
+  const unmetRequirements = isMulticlass
+    ? chosen
+        .map(({ cls: c }) => ({ cls: c, req: multiclassRequirement(c) }))
+        .filter(({ req }) => req && !req.met(finalScores))
+        .map(({ cls: c, req }) => `${c.name} needs ${req!.label}`)
+    : [];
+
+  // A new class re-lays the starting scores around its key abilities, unless
+  // the player has already arranged the scores themselves.
+  const primaryKey = primaryAbilities.join(',');
+  useEffect(() => {
+    if (method === 'custom' && !scoresArranged) setBase(suggestedArray(cls, undefined, primaryKey ? (primaryKey.split(',') as AbilityKey[]) : undefined));
+  }, [cls, primaryKey, method, scoresArranged]);
 
   const stepIndex = STEPS.findIndex((s) => s.key === step);
-  const canLeaveBasics = form.name.trim().length > 0 && form.race.trim().length > 0;
+  const current = STEPS[stepIndex];
 
-  const goNext = () => {
-    if (step === 'basics' && !canLeaveBasics) return;
-    const next = STEPS[stepIndex + 1];
-    if (next) setStep(next.key);
+  const done: Record<Step, boolean> = {
+    origin: !!race && (race.subraces.length === 0 || !!subrace),
+    calling: !!cls && subclassMissing.length === 0,
+    might: visited.has('might') && (method !== 'roll' || !!rolls) && asiChoices.every(asiIsComplete),
+    past: !!background,
+    talents: visited.has('talents') && skillsChosen === skillsToChoose && languagesChosen === languagesToChoose,
+    legend: name.trim().length > 0,
   };
-  const goBack = () => {
-    const prev = STEPS[stepIndex - 1];
-    if (prev) setStep(prev.key);
-    else onBack();
+  const canAdvance = step === 'origin' ? done.origin : step === 'calling' ? done.calling : step === 'might' ? done.might : step === 'past' ? done.past : true;
+
+  const goTo = (target: Step) => setStep(target);
+  const goNext = () => canAdvance && STEPS[stepIndex + 1] && setStep(STEPS[stepIndex + 1].key);
+  const goBack = () => (STEPS[stepIndex - 1] ? setStep(STEPS[stepIndex - 1].key) : onBack());
+
+  const railValue = (key: Step) => {
+    switch (key) {
+      case 'origin': return raceLabel || '—';
+      case 'calling': return shortClassSummary || '—';
+      case 'might': return !visited.has('might') ? '—' : primaryAbilities.length ? primaryAbilities.slice(0, 2).map((k) => `${ABILITY_META[k].short} ${finalScores[k]}`).join(' · ') : 'Set';
+      case 'past': return backgroundName || '—';
+      case 'talents': return visited.has('talents') ? `${skills.length} skills` : '—';
+      case 'legend': return name || '—';
+      default: return '';
+    }
   };
 
-  const handleCreate = async () => {
-    setLoading(true);
+  const toggleSkill = (poolKey: string, skill: string) => {
+    const pool = pools.find((p) => p.key === poolKey);
+    if (!pool) return;
+    const mine = picksBySource[poolKey] || [];
+    const next = mine.includes(skill) ? mine.filter((s) => s !== skill) : mine.length < pool.choose ? [...mine, skill] : mine;
+    setSkillPicks({ ...picksBySource, [poolKey]: next });
+  };
+
+  const toggleLanguage = (poolKey: string, language: string) => {
+    const pool = langSources.pools.find((p) => p.key === poolKey);
+    if (!pool) return;
+    const mine = languagePicksBySource[poolKey] || [];
+    const next = mine.includes(language) ? mine.filter((l) => l !== language) : mine.length < pool.choose ? [...mine, language] : mine;
+    setLanguagePicks({ ...languagePicksBySource, [poolKey]: next });
+  };
+
+  const homebrewParts = [
+    race?.homebrew ? `${race.name} (race)` : null,
+    ...chosen.filter((c) => c.cls.homebrew).map((c) => `${c.cls.name} (class)`),
+  ].filter(Boolean) as string[];
+
+  const handleForge = async () => {
+    if (!name.trim()) {
+      setError('Give your hero a name first.');
+      return;
+    }
+    if (portrait && portraitStatus !== 'ok') {
+      setError(portraitStatus === 'loading' ? 'Still loading your portrait; try again in a moment.' : 'That portrait link doesn’t load an image. Fix it or clear it.');
+      return;
+    }
+    setForging(true);
     setError('');
     try {
-      await createCharacter({
-        ...form,
+      const started = Date.now();
+      const imageId = portrait ? (await createImageAsset({ url: portrait })).data?.id : undefined;
+      const res = await createCharacter({
+        profile_image_id: imageId,
         game: 'dnd_5e',
-        char_class_index: charClassIndex || undefined,
-        subclass_index: subclassIndex || undefined,
+        name: name.trim(),
+        race: raceLabel,
+        level,
+        max_hp: hp,
+        current_hp: hp,
+        armor_class: ac,
+        ...finalScores,
+        skills,
+        languages,
+        background: backgroundName,
+        feats: takenFeats,
+        char_race_index: raceIndex || undefined,
+        subrace_index: subraceIndex || undefined,
+        classes: picks.map((p) => ({
+          char_class_index: p.index,
+          level: p.level,
+          subclass_index: p.subclassIndex || undefined,
+        })),
       });
-      navigate('/dashboard/characters');
+      // Let the forge animation play for a beat before showing the sheet.
+      const wait = Math.max(0, 1200 - (Date.now() - started));
+      window.setTimeout(() => navigate(res.data?.id ? `/dashboard/characters/${res.data.id}` : '/dashboard/characters'), wait);
     } catch (err: any) {
-      setError(err.response?.data?.errors?.join(', ') || 'Something went wrong');
-    } finally {
-      setLoading(false);
+      setForging(false);
+      setError(err.response?.data?.errors?.join(', ') || 'Something went wrong. Your choices are still here; try again.');
     }
   };
 
-  const railValue = (key: Step): string => {
-    switch (key) {
-      case 'basics':
-        return form.name.trim() ? `${form.name}${form.race ? ` · ${form.race}` : ''}` : 'Not started';
-      case 'class':
-        return selectedClass ? `${selectedClass.name}${selectedSubclass ? ` — ${selectedSubclass.name}` : ''}` : 'None yet';
-      case 'abilities':
-        return hpTouched ? `HP ${form.current_hp}/${form.max_hp}` : 'Not set';
-      case 'skills':
-        return form.skills.length > 0 ? `${form.skills.length} selected` : 'None selected';
-      case 'review':
-        return '';
-      default:
-        return '';
-    }
-  };
-
-  const railCompleted = (key: Step): boolean => {
-    switch (key) {
-      case 'basics': return canLeaveBasics;
-      case 'class': return !!selectedClass;
-      case 'abilities': return hpTouched;
-      case 'skills': return form.skills.length > 0;
-      default: return false;
-    }
-  };
+  const hue = getClassAuraHue(classIndex || null);
 
   return (
-    <div>
-      <h2 className="text-theme mb-3">New D&D 5e Character</h2>
-
-      {error && <div className="alert alert-danger">{error}</div>}
-
+    <div className={`builder ${forging ? 'is-forging' : ''}`} style={{ ['--builder-hue' as any]: hue }}>
       <div className="creation-layout">
-        {/* Left rail: step checklist */}
-        <div className="creation-rail">
-          {STEPS.map((s, i) => (
-            <button
-              key={s.key}
-              type="button"
-              className={`creation-rail-step ${step === s.key ? 'active' : ''} ${railCompleted(s.key) ? 'completed' : ''}`}
-              onClick={() => setStep(s.key)}
-            >
-              <span className="creation-rail-step-marker">{railCompleted(s.key) ? '✓' : i + 1}</span>
-              <span>
-                <div className="creation-rail-step-label">{s.label}</div>
-                {railValue(s.key) && <div className="creation-rail-step-value">{railValue(s.key)}</div>}
-              </span>
-            </button>
-          ))}
-        </div>
+        <nav className="creation-rail" aria-label="Character steps">
+          {STEPS.map((s, i) => {
+            const reachable = visited.has(s.key) || i <= stepIndex || STEPS.slice(0, i).every((p) => done[p.key] || p.key === 'talents');
+            return (
+              <button
+                key={s.key}
+                type="button"
+                className={`creation-rail-step ${step === s.key ? 'active' : ''} ${done[s.key] ? 'completed' : ''}`}
+                onClick={() => reachable && goTo(s.key)}
+                disabled={!reachable}
+                aria-current={step === s.key ? 'step' : undefined}
+              >
+                <span className="creation-rail-step-marker">{done[s.key] ? '✓' : i + 1}</span>
+                <span>
+                  <div className="creation-rail-step-label">{s.label}</div>
+                  <div className="creation-rail-step-value">{railValue(s.key)}</div>
+                </span>
+              </button>
+            );
+          })}
+        </nav>
 
-        {/* Center: active step */}
-        <div>
-          {step === 'basics' && (
-            <div className="card-theme p-4 mb-4">
-              <h5 className="text-theme mb-3">Name & Race</h5>
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <label className="form-label text-muted-theme">Name</label>
-                  <input
-                    type="text"
-                    name="name"
-                    className="form-control input-theme"
-                    value={form.name}
-                    onChange={handleChange}
-                    autoFocus
-                    required
-                  />
-                </div>
-                <div className="col-md-3">
-                  <label className="form-label text-muted-theme">Starting Level</label>
-                  <input
-                    type="number"
-                    name="level"
-                    className="form-control input-theme"
-                    min={1}
-                    max={20}
-                    value={form.level}
-                    onChange={handleNumberChange}
-                  />
-                </div>
-                <div className="col-md-3">
-                  <label className="form-label text-muted-theme">Armor Class</label>
-                  <input
-                    type="number"
-                    name="armor_class"
-                    className="form-control input-theme"
-                    min={0}
-                    value={form.armor_class}
-                    onChange={handleNumberChange}
-                  />
-                </div>
-              </div>
+        <section className="builder-stage" aria-live="polite">
+          <header className="builder-heading" key={step}>
+            <div className="builder-eyebrow">Step {stepIndex + 1} of {STEPS.length} · {current.label}</div>
+            <h2 className="builder-title">{current.title}</h2>
+            <p className="builder-prompt">{current.prompt}</p>
+          </header>
 
-              <label className="form-label text-muted-theme mt-3">Race</label>
+          {error && <div className="alert alert-danger">{error}</div>}
+
+          <div className="builder-step" key={`body-${step}`}>
+            {step === 'origin' && (
               <RaceIconPicker
                 selectedRaceIndex={raceIndex || null}
                 selectedSubraceIndex={subraceIndex || null}
                 onSelect={({ raceIndex: idx, raceName, subraceIndex: subIdx, subraceName }) => {
+                  if (idx !== raceIndex) setChosenBonuses([]);
                   setRaceIndex(idx);
                   setSubraceIndex(subIdx || '');
-                  setAbilitiesTouched(false);
-                  setForm({ ...form, race: subraceName ? `${raceName} (${subraceName})` : raceName });
+                  // "Hill Dwarf" rather than "Dwarf (Hill Dwarf)"; "Beasthide Shifter" for subraces that don't name the race.
+                  setRaceLabel(
+                    !subraceName ? raceName
+                      : subraceName.toLowerCase().includes(raceName.toLowerCase()) ? subraceName
+                      : `${subraceName} ${raceName}`,
+                  );
                 }}
               />
-            </div>
-          )}
+            )}
 
-          {step === 'class' && (
-            <div className="card-theme p-4 mb-4">
-              <h5 className="text-theme mb-3">Class</h5>
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <select
-                    className="form-select input-theme"
-                    value={charClassIndex}
-                    onChange={(e) => { setCharClassIndex(e.target.value); setSubclassIndex(''); }}
-                  >
-                    <option value="">Select class (optional)</option>
-                    {charClasses.map((c) => (
-                      <option key={c.index} value={c.index}>{c.name} (d{c.hit_die})</option>
-                    ))}
-                  </select>
-                </div>
-                {showSubclassField && selectedClass && (
-                  <div className="col-md-6">
-                    <select
-                      className="form-select input-theme"
-                      value={subclassIndex}
-                      onChange={(e) => setSubclassIndex(e.target.value)}
-                    >
-                      <option value="">Select subclass (optional)</option>
-                      {selectedClass.subclasses.map((sc) => (
-                        <option key={sc.index} value={sc.index}>{sc.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
+            {step === 'calling' && (
+              <>
+                {chosen.length > 0 && (
+                  <div className="builder-path">
+                    <div className="builder-path-head">
+                      <span className="race-section-label m-0">Your path</span>
+                      <span className="builder-path-total">
+                        Level <strong>{level}</strong>
+                        <small> / 20</small>
+                      </span>
+                    </div>
+                    {chosen.map(({ pick, cls: c }, i) => {
+                      const f = classFlavor(c);
+                      const subLevel = c.subclass_choice_level;
+                      const canSub = !!subLevel && pick.level >= subLevel && c.subclasses.length > 0;
+                      const req = isMulticlass ? multiclassRequirement(c) : null;
+                      return (
+                        <div key={c.index} className="builder-path-row" style={{ ['--class-hue' as any]: getClassAuraHue(c.index) }}>
+                          <div className="builder-path-main">
+                            <span className="builder-class-icon"><ClassIcon iconKey={classIconKey(c)} fallback={f.icon} size="2.2rem" /></span>
+                            <div className="builder-path-name">
+                              <strong>{c.name}</strong>
+                              <small>{i === 0 ? 'Starting class' : 'Multiclass'} · d{c.hit_die}</small>
+                            </div>
+                            <div className="builder-stepper" role="group" aria-label={`${c.name} level`}>
+                              <button type="button" onClick={() => setPickLevel(c.index, pick.level - 1)} disabled={pick.level <= 1} aria-label={`Lower ${c.name} level`}>−</button>
+                              <span aria-live="polite"><small>Lv</small>{pick.level}</span>
+                              <button type="button" onClick={() => setPickLevel(c.index, pick.level + 1)} disabled={levelsLeft < 1} aria-label={`Raise ${c.name} level`}>+</button>
+                            </div>
+                            <button type="button" className="builder-path-remove" onClick={() => removePick(c.index)} aria-label={`Remove ${c.name}`}>✕</button>
+                          </div>
 
-              {selectedClass && (
-                <div className="mt-3" style={{ fontSize: '0.85rem' }}>
-                  <p className="text-muted-theme mb-1">
-                    Hit Die d{selectedClass.hit_die}
-                    {selectedClass.saving_throws.length > 0 && (
-                      <> · Saving Throws: {selectedClass.saving_throws.map((a) => a.toUpperCase()).join(', ')}</>
-                    )}
-                    {selectedClass.spellcasting_ability && <> · Spellcasting: {selectedClass.spellcasting_ability.toUpperCase()}</>}
-                  </p>
-                  {!showSubclassField && selectedClass.subclass_choice_level && (
-                    <p className="text-muted-theme mb-0">
-                      {selectedClass.name} chooses a subclass at level {selectedClass.subclass_choice_level}.
+                          {canSub && (
+                            <div className="builder-path-sub">
+                              <span>
+                                {c.subclasses[0]?.subclass_flavor || 'Subclass'}
+                                {!pick.subclassIndex && <span className="race-needs">required</span>}
+                              </span>
+                              <div className="builder-subclass-grid">
+                                {c.subclasses.map((sc) => (
+                                  <button
+                                    key={sc.index}
+                                    type="button"
+                                    className={`builder-subclass ${pick.subclassIndex === sc.index ? 'is-selected' : ''}`}
+                                    onClick={() => updatePick(c.index, { subclassIndex: pick.subclassIndex === sc.index ? '' : sc.index })}
+                                    aria-pressed={pick.subclassIndex === sc.index}
+                                  >
+                                    <span className="builder-subclass-name">{sc.name}</span>
+                                    {sc.desc[0] && <span className="builder-subclass-desc">{sc.desc[0].length > 90 ? `${sc.desc[0].slice(0, 90)}…` : sc.desc[0]}</span>}
+                                    <span className="builder-subclass-source">{sc.source || 'SRD'}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {!canSub && subLevel ? (
+                            <div className="builder-path-note">{c.subclasses[0]?.subclass_flavor || 'Subclass'} at level {subLevel}</div>
+                          ) : null}
+                          {(() => {
+                            const gained = Array.from({ length: pick.level }, (_, n) => getFeaturesGainedAt(c, n + 1, pick.subclassIndex || null))
+                              .flat()
+                              .filter((feat) => !/^Ability Score Improvement/.test(feat.name));
+                            const numbers = classResources(c, pick.level);
+                            if (!gained.length && !numbers.length) return null;
+                            return (
+                              <details className="builder-path-features">
+                                <summary>
+                                  {gained.length} feature{gained.length === 1 ? '' : 's'} at level {pick.level}
+                                  {numbers.slice(0, 2).map((n) => <span key={n.label} className="race-chip ms-2">{n.label} {n.value}</span>)}
+                                </summary>
+                                {numbers.length > 0 && (
+                                  <div className="race-chips mb-2">
+                                    {numbers.map((n) => <span key={n.label} className="race-chip">{n.label} <strong>{n.value}</strong></span>)}
+                                  </div>
+                                )}
+                                <ul>
+                                  {gained.map((feat, n) => (
+                                    <li key={`${feat.index}-${n}`}><strong>{feat.name}</strong>{feat.desc[0] ? ` — ${feat.desc[0].length > 140 ? `${feat.desc[0].slice(0, 140)}…` : feat.desc[0]}` : ''}</li>
+                                  ))}
+                                </ul>
+                              </details>
+                            );
+                          })()}
+                          {req && <div className="builder-path-note">Multiclass needs {req.label}</div>}
+                          {c.homebrew && (
+                            <button type="button" className="race-change-link d-inline-block mt-1" onClick={() => setClassEditor({ open: true, existing: c })}>
+                              Edit {c.name}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <p className="builder-path-hint">
+                      {levelsLeft < 1
+                        ? 'You have reached level 20.'
+                        : chosen.length === 1
+                          ? 'Want to multiclass? Tap another class below to add it.'
+                          : 'Your first class gives your saving throws and starting skills.'}
                     </p>
-                  )}
-                </div>
-              )}
-
-              <p className="text-muted-theme mt-3 mb-0" style={{ fontSize: '0.8rem' }}>
-                Multiclassing is added later through the Level Up flow on the character sheet.
-              </p>
-            </div>
-          )}
-
-          {step === 'abilities' && (
-            <div className="card-theme p-4 mb-4">
-              <h5 className="text-theme mb-3">Ability Scores</h5>
-              {raceBonuses.length > 0 && !abilitiesTouched && (
-                <button type="button" className="btn btn-outline-secondary btn-sm mb-3" onClick={applyRaceBonuses}>
-                  Apply {form.race} bonuses ({raceBonuses.map((b) => `${b.ability_score.toUpperCase()} +${b.bonus}`).join(', ')})
-                </button>
-              )}
-              <div className="row g-3">
-                {ABILITY_SCORES.map(({ key, label }) => (
-                  <div className="col-4 col-md-2" key={key}>
-                    <label className="form-label text-muted-theme text-center d-block">{label}</label>
-                    <input
-                      type="number"
-                      name={key}
-                      className="form-control input-theme text-center"
-                      min={1}
-                      max={30}
-                      value={(form as any)[key]}
-                      onChange={handleNumberChange}
-                    />
                   </div>
-                ))}
-              </div>
+                )}
 
-              <hr className="sidebar-divider" />
+                {classesLoading && <p className="text-muted-theme">Gathering the callings…</p>}
+                <div className="builder-classes">
+                  {charClasses.map((c) => {
+                    const f = classFlavor(c);
+                    const pick = picks.find((p) => p.index === c.index);
+                    const unavailable = !pick && levelsLeft < 1;
+                    return (
+                      <button
+                        key={c.index}
+                        type="button"
+                        className={`builder-class ${pick ? 'is-selected' : ''}`}
+                        style={{ ['--class-hue' as any]: getClassAuraHue(c.index) }}
+                        onClick={() => addClass(c.index)}
+                        disabled={unavailable}
+                        aria-pressed={!!pick}
+                      >
+                        <span className="builder-class-icon"><ClassIcon iconKey={classIconKey(c)} fallback={f.icon} size="2.1rem" /></span>
+                        {pick && <span className="builder-class-badge">Lv {pick.level}</span>}
+                        {!pick && chosen.length > 0 && <span className="builder-class-badge is-add">+ Add</span>}
+                        <span className="builder-class-name">
+                          {c.name}
+                          {c.homebrew && <span className="homebrew-badge ms-2">Homebrew</span>}
+                        </span>
+                        <span className="builder-class-tagline">{f.tagline}</span>
+                        <span className="builder-class-meta">
+                          d{c.hit_die} · {f.primary.map((k) => ABILITY_META[k].short).join(' / ')}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  <button type="button" className="builder-class homebrew-add-tile" onClick={() => setClassEditor({ open: true, existing: null })}>
+                    <span className="builder-class-icon" aria-hidden="true">＋</span>
+                    <span className="builder-class-name">Homebrew class</span>
+                    <span className="builder-class-tagline">Build your own, or import one from a link.</span>
+                  </button>
+                </div>
 
-              <div className="row g-3 align-items-end">
-                <div className="col-md-4">
-                  <label className="form-label text-muted-theme">Max HP</label>
+                <HomebrewModal
+                  kind="class"
+                  isOpen={classEditor.open}
+                  existing={classEditor.existing}
+                  onClose={() => setClassEditor({ open: false, existing: null })}
+                  onSaved={(saved) => {
+                    // A brand-new homebrew class joins the path; an edited one stays where it is.
+                    if (!classEditor.existing) addClass(saved.index);
+                    else if (saved.index !== classEditor.existing.index) {
+                      setPicks((current) => current.map((p) => (p.index === classEditor.existing!.index ? { ...p, index: saved.index, subclassIndex: '' } : p)));
+                    }
+                  }}
+                  onDeleted={(index) => removePick(index)}
+                />
+              </>
+            )}
+
+            {step === 'might' && (
+              <AbilityStep
+                method={method}
+                onMethodChange={setMethod}
+                base={base}
+                onBaseChange={(next) => { setBase(next); setScoresArranged(true); }}
+                rolls={rolls}
+                onRollsChange={setRolls}
+                cls={cls}
+                primary={primaryAbilities}
+                classLabel={chosen.map((c) => c.cls.name).join('/')}
+                raceName={raceLabel}
+                fixedBonuses={fixedBonuses}
+                choice={bonusChoice}
+                chosen={chosenBonuses}
+                onChosenChange={setChosenBonuses}
+                finalScores={finalScores}
+              />
+            )}
+            {step === 'might' && (
+              <AsiStep choices={asiChoices} onChange={setAsiChoices} feats={featCatalog} scores={finalScores} />
+            )}
+
+            {step === 'past' && (
+              <BackgroundStep
+                selected={background}
+                onSelect={setBackgroundIndex}
+                customName={customBackground}
+                onCustomNameChange={setCustomBackground}
+              />
+            )}
+
+            {step === 'talents' && (
+              <TalentsStep
+                granted={granted}
+                pools={pools}
+                picks={picksBySource}
+                onToggle={toggleSkill}
+                scores={finalScores}
+                languages={{ known: langSources.known, pools: langSources.pools, picks: languagePicksBySource, onToggle: toggleLanguage }}
+              />
+            )}
+
+            {step === 'legend' && (
+              <div className="builder-legend">
+                <div className="builder-name-row">
                   <input
-                    type="number"
-                    name="max_hp"
-                    className="form-control input-theme"
-                    min={0}
-                    value={form.max_hp}
-                    onChange={handleNumberChange}
+                    type="text"
+                    className="form-control input-theme builder-name-input"
+                    placeholder="Name your hero"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleForge()}
+                    maxLength={80}
+                    autoFocus
+                    aria-label="Character name"
                   />
+                  <button type="button" className="btn btn-outline-secondary text-nowrap" onClick={() => setName(suggestName(raceIndex))} title="Suggest a name">
+                    🎲 <span className="d-none d-sm-inline">Inspire me</span>
+                  </button>
                 </div>
-                <div className="col-md-4">
-                  <label className="form-label text-muted-theme">Current HP</label>
-                  <input
-                    type="number"
-                    name="current_hp"
-                    className="form-control input-theme"
-                    min={0}
-                    value={form.current_hp}
-                    onChange={handleNumberChange}
-                  />
+
+                <div className="builder-portrait-field">
+                  <label htmlFor="portrait-url" className="race-section-label">Portrait <span className="text-muted-theme">(optional)</span></label>
+                  <div className="builder-portrait-row">
+                    <span className={`builder-portrait-thumb is-${portraitStatus}`} aria-hidden>
+                      {portraitStatus === 'ok' ? <img src={portrait} alt="" /> : portraitStatus === 'loading' ? '…' : portraitStatus === 'error' ? '!' : '🖼'}
+                    </span>
+                    <input
+                      id="portrait-url"
+                      type="url"
+                      inputMode="url"
+                      className="form-control input-theme"
+                      placeholder="Paste an image link (https://…)"
+                      value={portraitUrl}
+                      onChange={(e) => setPortraitUrl(e.target.value)}
+                      aria-describedby="portrait-help"
+                      aria-invalid={portraitStatus === 'error'}
+                    />
+                    {portraitUrl && (
+                      <button type="button" className="btn btn-outline-secondary" onClick={() => setPortraitUrl('')} aria-label="Clear portrait link">
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <small id="portrait-help" className={portraitStatus === 'error' ? 'builder-portrait-error' : 'text-muted-theme'}>
+                    {portraitStatus === 'error'
+                      ? portraitLooksValid ? 'That link didn’t load an image.' : 'Use a full link starting with https://'
+                      : portraitStatus === 'ok' ? 'Looking good. You can change it later on the sheet.' : 'A link to a picture of your hero. You can add or change it later.'}
+                  </small>
                 </div>
-                {suggestedHp !== null && !hpTouched && (
-                  <div className="col-md-4">
-                    <button type="button" className="btn btn-outline-secondary btn-sm" onClick={applySuggestedHp}>
-                      Use {selectedClass?.name} level 1 HP ({Math.max(1, suggestedHp)})
-                    </button>
+
+                <div className="builder-hero-card">
+                  <div className="builder-hero-line">
+                    <span className="builder-hero-name">{name || 'Your hero'}</span>
+                    <span className="builder-hero-sub">
+                      Level {level} {raceLabel} · {classSummary}{backgroundName ? ` · ${backgroundName}` : ''}
+                    </span>
+                  </div>
+                  <div className="builder-hero-vitals">
+                    <span><small>HP</small>{hp}</span>
+                    <span><small>AC</small>{ac}</span>
+                    <span><small>Hit dice</small>{chosen.length ? chosen.map((c) => `${c.pick.level}d${c.cls.hit_die}`).join(' + ') : 'd8'}</span>
+                  </div>
+                  <div className="builder-hero-scores">
+                    {ABILITY_KEYS.map((k) => (
+                      <span key={k} className={primaryAbilities.includes(k) ? 'is-primary' : ''}>
+                        <small>{ABILITY_META[k].short}</small>{finalScores[k]}<em>{signed(modifier(finalScores[k]))}</em>
+                      </span>
+                    ))}
+                  </div>
+                  {skills.length > 0 && <div className="builder-hero-skills">Trained in {skills.join(', ')}</div>}
+                  {languages.length > 0 && <div className="builder-hero-skills">Speaks {languages.join(', ')}</div>}
+                  {takenFeats.length > 0 && <div className="builder-hero-skills">Feats: {takenFeats.map((ft) => ft.name).join(', ')}</div>}
+                  <p className="text-muted-theme mb-0 mt-2" style={{ fontSize: '0.75rem' }}>
+                    HP and AC are worked out from your class, Constitution and Dexterity (no armour). You can change anything on the character sheet.
+                  </p>
+                </div>
+
+                {unmetRequirements.length > 0 && (
+                  <div className="homebrew-notice homebrew-notice--pending mt-3">
+                    Multiclass check: {unmetRequirements.join('; ')} (13 in that score). Your DM may still allow it.
+                  </div>
+                )}
+
+                {homebrewParts.length > 0 && (
+                  <div className="homebrew-notice homebrew-notice--info mt-3">
+                    Uses homebrew: {homebrewParts.join(', ')}. When this character joins a campaign, the DM approves the homebrew before they can play.
                   </div>
                 )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {step === 'skills' && (
-            <div className="card-theme p-4 mb-4">
-              <h5 className="text-theme mb-3">Skill Proficiencies</h5>
-              <div className="d-flex flex-wrap gap-2">
-                {DND_SKILLS.map(({ name: skill }) => (
-                  <button
-                    type="button"
-                    key={skill}
-                    className={`btn btn-sm ${form.skills.includes(skill) ? 'btn-theme-primary' : 'btn-outline-secondary'}`}
-                    onClick={() => toggleSkill(skill)}
-                  >
-                    {skill}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {step === 'review' && (
-            <div className="card-theme p-4 mb-4">
-              <h5 className="text-theme mb-3">Review</h5>
-              <ul style={{ paddingLeft: '1.1rem' }} className="text-theme">
-                <li>{form.name} — {form.race}, Level {form.level}</li>
-                <li>
-                  Class: {selectedClass ? `${selectedClass.name} (d${selectedClass.hit_die})` : 'None yet'}
-                  {selectedSubclass ? ` — ${selectedSubclass.name}` : ''}
-                </li>
-                <li>HP: {form.current_hp} / {form.max_hp} · AC: {form.armor_class}</li>
-                <li>
-                  {ABILITY_SCORES.map(({ key, label }) => `${label} ${(form as any)[key]}`).join(' · ')}
-                </li>
-                <li>Skills: {form.skills.length > 0 ? form.skills.join(', ') : 'None selected'}</li>
-              </ul>
-            </div>
-          )}
-
-          <div className="d-flex gap-2">
-            <button type="button" className="btn btn-outline-secondary" onClick={goBack}>
-              {step === 'basics' ? 'Change Game' : 'Back'}
+          <div className="builder-nav">
+            <button type="button" className="btn btn-outline-secondary" onClick={goBack} disabled={forging}>
+              Back
             </button>
-            {step !== 'review' ? (
-              <button
-                type="button"
-                className="btn btn-theme-primary"
-                onClick={goNext}
-                disabled={step === 'basics' && !canLeaveBasics}
-              >
-                Next
+            {step !== 'legend' ? (
+              <button type="button" className="btn btn-theme-primary" onClick={goNext} disabled={!canAdvance}>
+                {step === 'origin' && !race ? 'Choose a race' : step === 'origin' && !done.origin ? 'Choose a lineage' : step === 'calling' && !cls ? 'Choose a class' : step === 'calling' && subclassMissing.length ? `Choose a ${subclassMissing[0].cls.subclasses[0]?.subclass_flavor || 'subclass'}` : step === 'might' && !asiChoices.every(asiIsComplete) ? 'Choose improvements' : step === 'past' && !background ? 'Choose a background' : step === 'talents' && skillsChosen + languagesChosen < skillsToChoose + languagesToChoose ? `Continue (${skillsToChoose + languagesToChoose - skillsChosen - languagesChosen} unchosen)` : 'Continue'}
               </button>
             ) : (
-              <button type="button" className="btn btn-theme-primary" onClick={handleCreate} disabled={loading}>
-                {loading ? 'Creating...' : 'Create Character'}
+              <button type="button" className="btn btn-theme-primary builder-forge" onClick={handleForge} disabled={forging || !name.trim()}>
+                {forging ? 'Forging…' : `Forge ${name.trim() || 'your hero'}`}
               </button>
             )}
           </div>
-        </div>
+        </section>
 
-        {/* Right: live preview */}
-        <div className="creation-preview card-theme p-3">
-          <CharacterAura hue={getClassAuraHue(charClassIndex || null)} />
-          <h5 className="text-theme text-center mt-3 mb-0">{form.name || 'Unnamed'}</h5>
+        <aside className="creation-preview card-theme p-3" aria-label="Character preview">
+          <div className="builder-portrait">
+            <CharacterAura hue={hue} />
+            {portraitStatus === 'ok' ? (
+              <span className="builder-portrait-icon">
+                <img className="builder-portrait-img" src={portrait} alt={`${name || 'Your hero'} portrait`} />
+              </span>
+            ) : raceIndex && (
+              <span className="builder-portrait-icon">
+                <RaceIcon index={raceIconKey(race) || raceIndex} size="4.5rem" />
+              </span>
+            )}
+          </div>
+          <h5 className="text-theme text-center mt-3 mb-0">{name || 'Your hero'}</h5>
           <p className="text-muted-theme text-center mb-0" style={{ fontSize: '0.8rem' }}>
-            {form.race || 'No race'} {selectedClass ? `· ${selectedClass.name} 1` : ''}
+            {[raceLabel, shortClassSummary || null].filter(Boolean).join(' · ') || 'Choose an origin to begin'}
           </p>
 
           <div className="creation-preview-stats">
-            {ABILITY_SCORES.map(({ key, label }) => {
-              const score = (form as any)[key];
-              const mod = getModifier(score);
-              return (
-                <div className="creation-preview-stat" key={key}>
-                  <div className="creation-preview-stat-label">{label}</div>
-                  <div className="creation-preview-stat-value">{score}</div>
-                  <div className="creation-preview-stat-label">{mod >= 0 ? `+${mod}` : mod}</div>
-                </div>
-              );
-            })}
+            {ABILITY_KEYS.map((k) => (
+              <div className={`creation-preview-stat ${primaryAbilities.includes(k) ? 'is-primary' : ''}`} key={k}>
+                <div className="creation-preview-stat-label">{ABILITY_META[k].short}</div>
+                <div className="creation-preview-stat-value">{finalScores[k]}</div>
+                <div className="creation-preview-stat-label">{signed(modifier(finalScores[k]))}</div>
+              </div>
+            ))}
           </div>
 
           <hr className="sidebar-divider" />
-          <p className="text-muted-theme mb-1" style={{ fontSize: '0.8rem' }}>
-            HP {form.current_hp}/{form.max_hp} · AC {form.armor_class}
+          <p className="text-muted-theme mb-0 text-center" style={{ fontSize: '0.8rem' }}>
+            HP {hp} · AC {ac} · Level {level}
           </p>
-          {selectedClass && (
-            <p className="text-muted-theme mb-0" style={{ fontSize: '0.8rem' }}>
-              Hit Die d{selectedClass.hit_die}
-            </p>
-          )}
-        </div>
+        </aside>
       </div>
     </div>
   );

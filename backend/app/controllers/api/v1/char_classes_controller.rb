@@ -1,14 +1,12 @@
 class Api::V1::CharClassesController < ApplicationController
-  include Authenticatable
+  include HomebrewCrud
 
-  def index
-    render json: CharClass.where(game: params[:game] || 'dnd_5e').order(:name), status: :ok
-  end
+  private
 
-  def show
-    char_class = CharClass.find_by!(index: params[:id], game: params[:game] || 'dnd_5e')
-    render json: char_class, status: :ok
-  rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Class not found' }, status: :not_found
+  def model = CharClass
+  def label = 'Class'
+
+  def normalized_attributes
+    HomebrewNormalizer.class_attributes(params.fetch(:char_class, params).to_unsafe_h)
   end
 end

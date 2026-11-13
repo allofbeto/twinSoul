@@ -1,0 +1,315 @@
+/* Homebrew editor, homebrew badges, and DM review states. Uses the app's
+   theme tokens so it follows whichever theme the user picked. */
+
+.homebrew-import {
+  padding: 0.75rem;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--border-radius);
+  background: var(--color-surface-raised);
+}
+
+.homebrew-entry,
+.homebrew-subsection {
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+}
+
+.homebrew-subsection {
+  padding: 0.75rem;
+  background: var(--color-surface-raised);
+}
+
+.homebrew-bonus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.homebrew-bonus input {
+  width: 100%;
+}
+
+/* Six abilities in one row; three per row on narrow phones. */
+.homebrew-bonus-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 4rem));
+  gap: 0.5rem;
+}
+
+@media (max-width: 400px) {
+  .homebrew-bonus-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* The editor modal follows the app theme instead of Bootstrap's white
+   default, so the theme-coloured labels and boxes inside stay readable. */
+.modal-content.homebrew-modal,
+.modal-content.theme-modal {
+  --bs-modal-bg: var(--color-surface);
+  --bs-modal-color: var(--color-text);
+  --bs-modal-border-color: var(--color-border);
+  --bs-modal-header-border-color: var(--color-border);
+  --bs-modal-footer-border-color: var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.homebrew-modal .modal-header,
+.homebrew-modal .modal-footer,
+.theme-modal .modal-header,
+.theme-modal .modal-footer {
+  border-color: var(--color-border);
+}
+
+.homebrew-modal .btn-close,
+.theme-modal .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+.homebrew-modal details summary {
+  padding: 0.25rem 0;
+}
+
+.homebrew-import-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.homebrew-import-row .btn {
+  white-space: nowrap;
+}
+
+.homebrew-modal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.homebrew-modal-footer > * {
+  margin: 0;
+}
+
+.homebrew-modal-footer__hint {
+  flex: 1 1 14rem;
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+.homebrew-modal-footer__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Phones: the modal is full screen (fullscreen="sm"). Bigger tap targets,
+   16px inputs so iOS doesn't zoom in on focus, and stacked action rows. */
+@media (max-width: 575.98px) {
+  .homebrew-modal .modal-body {
+    padding: 0.85rem;
+  }
+
+  .homebrew-modal .form-control,
+  .homebrew-modal .form-select {
+    font-size: 16px;
+  }
+
+  .homebrew-modal .btn-sm {
+    min-height: 2.5rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .homebrew-import-row {
+    flex-direction: column;
+  }
+
+  .homebrew-modal-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  /* The wizard's review step already says this; keep the footer short. */
+  .homebrew-modal-footer__hint {
+    display: none;
+  }
+
+  .homebrew-modal-footer__actions {
+    width: 100%;
+  }
+
+  .homebrew-modal-footer__actions .btn {
+    flex: 1;
+  }
+
+  .homebrew-modal-footer__delete:empty {
+    display: none;
+  }
+
+  .homebrew-modal-footer__delete .btn {
+    width: 100%;
+  }
+}
+
+.homebrew-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-secondary, var(--color-primary));
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.homebrew-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.homebrew-status--pending { color: var(--color-warning, #f59e0b); }
+.homebrew-status--approved { color: var(--color-success); }
+.homebrew-status--rejected { color: var(--color-error); }
+
+.homebrew-notice {
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--color-border);
+  border-left-width: 3px;
+  font-size: 0.82rem;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+}
+
+.homebrew-notice--info { border-left-color: var(--color-primary); }
+.homebrew-notice--pending { border-left-color: var(--color-warning, #f59e0b); }
+.homebrew-notice--rejected { border-left-color: var(--color-error); }
+.homebrew-notice--approved { border-left-color: var(--color-success); }
+
+.homebrew-add-tile {
+  border-style: dashed !important;
+  color: var(--color-text-muted);
+}
+
+.homebrew-add-tile:hover {
+  color: var(--color-text);
+}
+
+.homebrew-review-card + .homebrew-review-card {
+  margin-top: 1rem;
+}
+
+.homebrew-review-actions textarea {
+  min-height: 2.4rem;
+}
+
+.tab-count {
+  display: inline-block;
+  min-width: 1.2rem;
+  margin-left: 0.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  line-height: 1.2rem;
+  text-align: center;
+  color: #fff;
+  background: var(--color-warning, #f59e0b);
+}
+
+/* Race picker: search box + Core/Expanded/Homebrew filter. */
+.race-picker-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.race-picker-toolbar input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.race-picker-filters {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+}
+
+@media (max-width: 575.98px) {
+  .race-picker-toolbar input {
+    font-size: 16px;
+  }
+
+  .race-picker-filters {
+    width: 100%;
+  }
+
+  .race-picker-filters .btn {
+    flex: 1;
+  }
+}
+
+/* Drawn race icons (public/race-icons) used as masks, so they take the
+   theme's colours. */
+.race-icon {
+  display: inline-block;
+  vertical-align: middle;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+
+/* Homebrew icon picker */
+.homebrew-icon-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-height: 9.5rem;
+  overflow-y: auto;
+  padding: 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+}
+
+.homebrew-icon-option {
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: var(--border-radius);
+  border: 1px solid transparent;
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  padding: 0;
+}
+
+.homebrew-icon-option:hover {
+  color: var(--color-text);
+}
+
+.homebrew-icon-option.is-selected {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}

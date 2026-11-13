@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
-import { Modal, ModalBody, ModalHeader, ModalFooter } from 'reactstrap';
+import React, { useRef, useState } from 'react';
 import { useCharRaces, findCharRace } from '../useCharRaces';
-import { getRaceIcon, Subrace } from '../raceTypes';
+import { CharRace, isCoreRace, RaceTrait, Subrace, raceIconKey } from '../raceTypes';
+import { isSelectableBy } from '../referenceCache';
+import { useAuth } from '../../../../context/AuthContext';
+import HomebrewModal from '../homebrew/HomebrewModal';
+import RaceIcon from './RaceIcon';
+import '../../../../styles/homebrew.css';
+import '../../../../styles/characterCreation.css';
 
 interface Props {
   selectedRaceIndex: string | null;
@@ -9,148 +14,249 @@ interface Props {
   onSelect: (args: { raceIndex: string; raceName: string; subraceIndex?: string; subraceName?: string }) => void;
 }
 
-const formatBonus = (ability: string, bonus: number) => `${ability.toUpperCase()} +${bonus}`;
+const formatBonus = (ability: string, bonus: number) => `${ability.toUpperCase()} ${bonus > 0 ? '+' : ''}${bonus}`;
 
+type RaceFilter = 'all' | 'core' | 'expanded' | 'homebrew';
+
+const FILTERS: { key: RaceFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'core', label: 'Core' },
+  { key: 'expanded', label: 'Expanded' },
+  { key: 'homebrew', label: 'Homebrew' },
+];
+
+const matchesFilter = (race: CharRace, filter: RaceFilter) => {
+  if (filter === 'core') return isCoreRace(race);
+  if (filter === 'expanded') return !race.homebrew && !isCoreRace(race);
+  if (filter === 'homebrew') return !!race.homebrew;
+  return true;
+};
+
+// Traits that only restate numbers already shown as chips.
+const HIDDEN_TRAITS = new Set(['ability-score-increase']);
+
+const TraitCard = ({ trait, from }: { trait: RaceTrait; from?: string }) => (
+  <div className="race-trait">
+    <div className="race-trait-name">
+      {trait.name}
+      {from && <span className="race-trait-from">{from}</span>}
+    </div>
+    {trait.desc.map((d, i) => (
+      <p key={i} className="race-trait-desc">{d}</p>
+    ))}
+  </div>
+);
+
+// Race selection for the character builder: one tap picks a race, and the
+// spotlight above the grid shows everything about it, including subraces.
 const RaceIconPicker = ({ selectedRaceIndex, selectedSubraceIndex, onSelect }: Props) => {
-  const { races, loading } = useCharRaces('dnd_5e');
-  const [openRaceIndex, setOpenRaceIndex] = useState<string | null>(null);
-  const [pendingSubrace, setPendingSubrace] = useState<Subrace | null>(null);
+  const { races: allRaces, loading } = useCharRaces('dnd_5e');
+  const { user } = useAuth();
+  const races = allRaces.filter((r) => isSelectableBy(r, user?.id));
+  const [filter, setFilter] = useState<RaceFilter>('all');
+  const [query, setQuery] = useState('');
+  const [homebrewEditor, setHomebrewEditor] = useState<{ open: boolean; existing: CharRace | null }>({ open: false, existing: null });
+  const spotlightRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
-  const openRace = findCharRace(races, openRaceIndex || undefined);
+  const selected = findCharRace(races, selectedRaceIndex);
+  const subrace = selected?.subraces.find((s) => s.index === selectedSubraceIndex);
 
-  const handleOpen = (raceIndex: string) => {
-    setOpenRaceIndex(raceIndex);
-    setPendingSubrace(null);
-  };
+  const q = query.trim().toLowerCase();
+  const shownRaces = races.filter(
+    (r) => matchesFilter(r, filter) && (!q || r.name.toLowerCase().includes(q) || r.subraces.some((s) => s.name.toLowerCase().includes(q))),
+  );
 
-  const handleClose = () => {
-    setOpenRaceIndex(null);
-    setPendingSubrace(null);
-  };
-
-  const handleConfirm = () => {
-    if (!openRace) return;
-    onSelect({
-      raceIndex: openRace.index,
-      raceName: openRace.name,
-      subraceIndex: pendingSubrace?.index,
-      subraceName: pendingSubrace?.name,
+  const pickRace = (race: CharRace) => {
+    if (race.index !== selectedRaceIndex) onSelect({ raceIndex: race.index, raceName: race.name });
+    // Bring the spotlight into view when it is off screen (phones, long grid).
+    window.requestAnimationFrame(() => {
+      const el = spotlightRef.current;
+      if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
-    handleClose();
   };
+
+  const pickSubrace = (race: CharRace, sr: Subrace) =>
+    onSelect({ raceIndex: race.index, raceName: race.name, subraceIndex: sr.index, subraceName: sr.name });
+
+  const bonuses = [...(selected?.ability_bonuses || []), ...(subrace?.ability_bonuses || [])];
 
   return (
     <div>
-      {loading && <p className="text-muted-theme">Loading races...</p>}
-      <div className="row g-3">
-        {races.map((r) => {
-          const isSelected = r.index === selectedRaceIndex;
-          return (
-            <div className="col-4 col-md-3 col-lg-2" key={r.index}>
-              <div
-                className="card-theme p-3 text-center"
-                style={{
-                  cursor: 'pointer',
-                  position: 'relative',
-                  border: isSelected ? '2px solid var(--theme-primary, #6a5acd)' : undefined,
-                }}
-                onClick={() => handleOpen(r.index)}
-              >
-                {isSelected && (
-                  <span style={{ position: 'absolute', top: '0.35rem', right: '0.5rem', fontSize: '0.75rem' }}>✓</span>
+      <div ref={spotlightRef} className={`race-spotlight ${selected ? 'has-race' : ''}`} aria-live="polite">
+        {!selected ? (
+          <div className="race-spotlight-empty">
+            <span className="race-spotlight-empty-mark" aria-hidden="true">✦</span>
+            <div>
+              <div className="race-spotlight-empty-title">Choose your people</div>
+              <div className="race-spotlight-empty-text">Tap a race below to see its gifts.</div>
+            </div>
+          </div>
+        ) : (
+          <div key={selected.index} className="race-spotlight-body">
+            <div className="race-spotlight-head">
+              <div className="race-spotlight-icon">
+                <RaceIcon index={raceIconKey(selected)} size="4.25rem" />
+              </div>
+              <div className="race-spotlight-intro">
+                <h3 className="race-spotlight-name">
+                  {subrace ? subrace.name : selected.name}
+                  {selected.homebrew && <span className="homebrew-badge ms-2">Homebrew</span>}
+                </h3>
+                <button
+                  type="button"
+                  className="race-change-link"
+                  onClick={() => gridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                >
+                  Change race ↓
+                </button>
+                {(selected.description || subrace?.desc) && (
+                  <p className="race-spotlight-blurb">{subrace?.desc || selected.description}</p>
                 )}
-                <div style={{ fontSize: '2rem', lineHeight: 1 }}>{getRaceIcon(r.index)}</div>
-                <div className="text-theme mt-2" style={{ fontSize: '0.85rem' }}>
-                  {isSelected && selectedSubraceIndex
-                    ? r.subraces.find((s) => s.index === selectedSubraceIndex)?.name || r.name
-                    : r.name}
+                <div className="race-chips">
+                  {bonuses.map((b, i) => (
+                    <span key={`${b.ability_score}-${i}`} className={`race-chip race-chip--bonus ${b.bonus < 0 ? 'is-negative' : ''}`}>
+                      {formatBonus(b.ability_score, b.bonus)}
+                    </span>
+                  ))}
+                  <span className="race-chip">{selected.speed} ft</span>
+                  <span className="race-chip">{selected.size}</span>
+                  {selected.languages.length > 0 && <span className="race-chip">{selected.languages.join(', ')}</span>}
                 </div>
               </div>
             </div>
-          );
-        })}
-      </div>
 
-      <Modal isOpen={!!openRace} toggle={handleClose} size="lg">
-        {openRace && (
-          <>
-            <ModalHeader toggle={handleClose}>
-              {getRaceIcon(openRace.index)} {openRace.name}
-            </ModalHeader>
-            <ModalBody>
-              <p className="text-muted-theme" style={{ fontSize: '0.85rem' }}>
-                Speed {openRace.speed} ft. · Size {openRace.size}
-              </p>
-
-              <div className="d-flex flex-wrap gap-2 mb-3">
-                {openRace.ability_bonuses.map((b) => (
-                  <span key={b.ability_score} className="badge-cls">{formatBonus(b.ability_score, b.bonus)}</span>
-                ))}
-                {pendingSubrace?.ability_bonuses.map((b) => (
-                  <span key={`sub-${b.ability_score}`} className="badge-cls">{formatBonus(b.ability_score, b.bonus)} ({pendingSubrace.name})</span>
-                ))}
+            {selected.subraces.length > 0 && (
+              <div className="race-subraces">
+                <div className="race-section-label">
+                  Choose your lineage {!subrace && <span className="race-needs">required</span>}
+                </div>
+                <div className="race-subrace-grid">
+                  {selected.subraces.map((sr) => (
+                    <button
+                      key={sr.index}
+                      type="button"
+                      className={`race-subrace ${sr.index === selectedSubraceIndex ? 'is-selected' : ''}`}
+                      onClick={() => pickSubrace(selected, sr)}
+                      aria-pressed={sr.index === selectedSubraceIndex}
+                    >
+                      <span className="race-subrace-name">{sr.name}</span>
+                      {sr.ability_bonuses.length > 0 && (
+                        <span className="race-subrace-bonus">{sr.ability_bonuses.map((b) => formatBonus(b.ability_score, b.bonus)).join(' · ')}</span>
+                      )}
+                      {sr.racial_traits.length > 0 && (
+                        <span className="race-subrace-traits">{sr.racial_traits.map((t) => t.name).join(', ')}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
+            )}
 
-              <p className="text-theme" style={{ fontSize: '0.85rem' }}>{openRace.size_description}</p>
+            <div className="race-traits">
+              {selected.traits.filter((t) => !HIDDEN_TRAITS.has(t.index)).map((t) => (
+                <TraitCard key={t.index} trait={t} />
+              ))}
+              {subrace?.racial_traits.map((t) => (
+                <TraitCard key={`sub-${t.index}`} trait={t} from={subrace.name} />
+              ))}
+            </div>
 
-              <h6 className="text-theme mt-3 mb-2">Traits</h6>
-              <div className="d-flex flex-column gap-1">
-                {openRace.traits.map((t) => (
-                  <details key={t.index} style={{ fontSize: '0.82rem' }}>
-                    <summary className="text-theme" style={{ cursor: 'pointer' }}>{t.name}</summary>
-                    {t.desc.map((d, i) => (
-                      <p key={i} className="text-muted-theme" style={{ fontSize: '0.78rem', marginLeft: '0.5rem' }}>{d}</p>
-                    ))}
-                  </details>
-                ))}
-                {pendingSubrace?.racial_traits.map((t) => (
-                  <details key={`sub-${t.index}`} style={{ fontSize: '0.82rem' }}>
-                    <summary className="text-theme" style={{ cursor: 'pointer' }}>{t.name} <span className="text-muted-theme">({pendingSubrace.name})</span></summary>
-                    {t.desc.map((d, i) => (
-                      <p key={i} className="text-muted-theme" style={{ fontSize: '0.78rem', marginLeft: '0.5rem' }}>{d}</p>
-                    ))}
-                  </details>
-                ))}
-              </div>
-
-              {openRace.languages.length > 0 && (
-                <p className="text-muted-theme mt-3 mb-0" style={{ fontSize: '0.8rem' }}>
-                  Languages: {openRace.languages.join(', ')}
-                </p>
+            <div className="race-spotlight-foot">
+              {!selected.homebrew && selected.source && (
+                <span>
+                  {selected.source}
+                  {!isCoreRace(selected) && ' · traits summarised, see the book for full rules'}
+                </span>
               )}
-
-              {openRace.subraces.length > 0 && (
+              {selected.homebrew && (
                 <>
-                  <h6 className="text-theme mt-3 mb-2">Choose a Subrace</h6>
-                  <div className="d-flex flex-wrap gap-2">
-                    {openRace.subraces.map((sr) => (
-                      <button
-                        key={sr.index}
-                        type="button"
-                        className={`btn btn-sm ${pendingSubrace?.index === sr.index ? 'btn-theme-primary' : 'btn-outline-secondary'}`}
-                        onClick={() => setPendingSubrace(pendingSubrace?.index === sr.index ? null : sr)}
-                      >
-                        {sr.name}
-                      </button>
-                    ))}
-                  </div>
-                  {pendingSubrace && (
-                    <p className="text-muted-theme mt-2 mb-0" style={{ fontSize: '0.78rem' }}>{pendingSubrace.desc}</p>
+                  {selected.source_url && (
+                    <a href={selected.source_url} target="_blank" rel="noopener noreferrer">Source page ↗</a>
                   )}
+                  <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setHomebrewEditor({ open: true, existing: selected })}>
+                    Edit homebrew
+                  </button>
                 </>
               )}
-            </ModalBody>
-            <ModalFooter>
-              <button type="button" className="btn btn-outline-secondary btn-sm" onClick={handleClose}>
-                Cancel
-              </button>
-              <button type="button" className="btn btn-theme-primary btn-sm" onClick={handleConfirm}>
-                Choose {openRace.name}{pendingSubrace ? ` — ${pendingSubrace.name}` : ''}
-              </button>
-            </ModalFooter>
-          </>
+            </div>
+          </div>
         )}
-      </Modal>
+      </div>
+
+      <div ref={gridRef} />
+      {loading && <p className="text-muted-theme">Loading races...</p>}
+      {!loading && (
+        <div className="race-picker-toolbar mb-3">
+          <input
+            type="search"
+            className="form-control input-theme form-control-sm"
+            placeholder="Search races"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search races"
+          />
+          <div className="race-picker-filters" role="group" aria-label="Filter races">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                className={`race-filter ${filter === f.key ? 'is-active' : ''}`}
+                onClick={() => setFilter(f.key)}
+                aria-pressed={filter === f.key}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {!loading && shownRaces.length === 0 && (
+        <p className="text-muted-theme" style={{ fontSize: '0.85rem' }}>
+          No races match. Try another search, or make it as a homebrew race.
+        </p>
+      )}
+
+      <div className="race-grid">
+        {shownRaces.map((r) => {
+          const isSelected = r.index === selectedRaceIndex;
+          return (
+            <button
+              key={r.index}
+              type="button"
+              className={`race-tile ${isSelected ? 'race-tile--selected' : ''}`}
+              onClick={() => pickRace(r)}
+              aria-pressed={isSelected}
+            >
+              <RaceIcon index={raceIconKey(r)} size="2.4rem" />
+              <span className="race-tile-name">{r.name}</span>
+              {r.homebrew && <span className="homebrew-badge">Homebrew</span>}
+            </button>
+          );
+        })}
+        {!loading && (
+          <button
+            type="button"
+            className="race-tile homebrew-add-tile"
+            onClick={() => setHomebrewEditor({ open: true, existing: null })}
+          >
+            <span className="race-tile-plus" aria-hidden="true">＋</span>
+            <span className="race-tile-name">Homebrew</span>
+          </button>
+        )}
+      </div>
+
+      <HomebrewModal
+        kind="race"
+        isOpen={homebrewEditor.open}
+        existing={homebrewEditor.existing}
+        onClose={() => setHomebrewEditor({ open: false, existing: null })}
+        onSaved={(race) => {
+          if (!homebrewEditor.existing || homebrewEditor.existing.index === selectedRaceIndex) {
+            onSelect({ raceIndex: race.index, raceName: race.name });
+          }
+        }}
+      />
     </div>
   );
 };

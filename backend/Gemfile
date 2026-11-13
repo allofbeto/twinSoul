@@ -49,3 +49,6 @@ end
 # Added because claude
 gem 'jwt'
 
+
+# Extracts homebrew races/classes from a pasted URL (HomebrewImporter).
+gem "anthropic"

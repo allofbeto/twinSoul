@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_10_25_163557) do
+ActiveRecord::Schema[7.0].define(version: 2026_11_13_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -47,7 +47,12 @@ ActiveRecord::Schema[7.0].define(version: 2026_10_25_163557) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "game", default: "dnd_5e", null: false
+    t.uuid "user_id"
+    t.string "source_url"
+    t.text "description"
+    t.string "icon"
     t.index ["game", "index"], name: "index_char_classes_on_game_and_index", unique: true
+    t.index ["user_id"], name: "index_char_classes_on_user_id"
   end
 
   create_table "char_races", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -67,7 +72,12 @@ ActiveRecord::Schema[7.0].define(version: 2026_10_25_163557) do
     t.string "source", default: "SRD 5.1"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.uuid "user_id"
+    t.string "source_url"
+    t.text "description"
+    t.string "icon"
     t.index ["game", "index"], name: "index_char_races_on_game_and_index", unique: true
+    t.index ["user_id"], name: "index_char_races_on_user_id"
   end
 
   create_table "character_classes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -108,7 +118,18 @@ ActiveRecord::Schema[7.0].define(version: 2026_10_25_163557) do
     t.uuid "campaign_id"
     t.integer "temp_hp", default: 0, null: false
     t.integer "temp_ac_bonus", default: 0, null: false
+    t.uuid "char_race_id"
+    t.string "subrace_index"
+    t.string "homebrew_status"
+    t.text "homebrew_review_note"
+    t.datetime "homebrew_reviewed_at"
+    t.uuid "homebrew_reviewed_by_id"
+    t.jsonb "feats", default: [], null: false
+    t.string "background"
+    t.string "languages", default: [], null: false, array: true
     t.index ["campaign_id"], name: "index_characters_on_campaign_id"
+    t.index ["char_race_id"], name: "index_characters_on_char_race_id"
+    t.index ["homebrew_reviewed_by_id"], name: "index_characters_on_homebrew_reviewed_by_id"
     t.index ["profile_image_id"], name: "index_characters_on_profile_image_id"
     t.index ["user_id"], name: "index_characters_on_user_id"
   end
@@ -152,6 +173,20 @@ ActiveRecord::Schema[7.0].define(version: 2026_10_25_163557) do
     t.index ["campaign_id"], name: "index_encounters_on_campaign_id"
     t.index ["session_id"], name: "index_encounters_on_session_id"
     t.index ["user_id"], name: "index_encounters_on_user_id"
+  end
+
+  create_table "feats", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "game", default: "dnd_5e", null: false
+    t.string "index", null: false
+    t.string "name", null: false
+    t.string "source"
+    t.string "prerequisite"
+    t.jsonb "desc", default: [], null: false
+    t.jsonb "ability_options", default: [], null: false
+    t.integer "ability_bonus", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game", "index"], name: "index_feats_on_game_and_index", unique: true
   end
 
   create_table "image_assets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -317,11 +352,15 @@ ActiveRecord::Schema[7.0].define(version: 2026_10_25_163557) do
 
   add_foreign_key "campaigns", "inventories"
   add_foreign_key "campaigns", "users"
+  add_foreign_key "char_classes", "users"
+  add_foreign_key "char_races", "users"
   add_foreign_key "character_classes", "char_classes"
   add_foreign_key "character_classes", "characters"
   add_foreign_key "characters", "campaigns"
+  add_foreign_key "characters", "char_races"
   add_foreign_key "characters", "image_assets", column: "profile_image_id"
   add_foreign_key "characters", "users"
+  add_foreign_key "characters", "users", column: "homebrew_reviewed_by_id"
   add_foreign_key "encounter_monsters", "encounter_phases"
   add_foreign_key "encounter_monsters", "items"
   add_foreign_key "encounter_monsters", "monsters"

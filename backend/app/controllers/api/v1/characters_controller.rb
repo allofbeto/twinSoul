@@ -2,7 +2,7 @@ class Api::V1::CharactersController < ApplicationController
     include Authenticatable
     wrap_parameters false
   
-    CHARACTER_METHODS = [:classes, :character_class_summaries, :proficiency_bonus].freeze
+    CHARACTER_METHODS = [:classes, :character_class_summaries, :proficiency_bonus, :homebrew_summary].freeze
 
     def index
       characters = @current_user.characters.includes(character_classes: :char_class)
@@ -25,7 +25,8 @@ class Api::V1::CharactersController < ApplicationController
               :id,
               :name
             ]
-          }
+          },
+          char_race: { only: [:index, :name, :user_id] }
         }
       ), status: :ok
     rescue ActiveRecord::RecordNotFound
@@ -34,17 +35,21 @@ class Api::V1::CharactersController < ApplicationController
 
     def create
       character = @current_user.characters.build(character_params)
+      assign_char_race(character)
+      class_picks = requested_class_picks(character)
+      return render json: { errors: class_picks[:errors] }, status: :unprocessable_entity if class_picks[:errors]
+
+      # With classes, the character's level is the sum of its class levels.
+      character.level = class_picks[:picks].sum { |p| p[:level] } if class_picks[:picks].any?
       ActiveRecord::Base.transaction do
         character.save!
-        if params[:char_class_index].present?
-          char_class = CharClass.find_by(index: params[:char_class_index], game: character.game)
-          if char_class
-            character.character_classes.create!(
-              char_class: char_class,
-              level: character.level,
-              subclass_index: params[:subclass_index].presence
-            )
-          end
+        # Created in order, so the first pick stays the starting class.
+        class_picks[:picks].each do |pick|
+          character.character_classes.create!(
+            char_class: pick[:char_class],
+            level: pick[:level],
+            subclass_index: pick[:subclass_index]
+          )
         end
       end
       render json: character.as_json(
@@ -62,22 +67,44 @@ class Api::V1::CharactersController < ApplicationController
       render json: { errors: character.errors.full_messages }, status: :unprocessable_entity
     end
 
+    # Classes for a new character. Accepts `classes: [{char_class_index,
+    # level, subclass_index}]` (multiclass, first entry = starting class) or
+    # the older single `char_class_index` + `subclass_index`.
+    def requested_class_picks(character)
+      raw =
+        if params[:classes].is_a?(Array)
+          params[:classes].map { |c| c.permit(:char_class_index, :level, :subclass_index).to_h.symbolize_keys }
+        elsif params[:char_class_index].present?
+          [{ char_class_index: params[:char_class_index], level: character.level, subclass_index: params[:subclass_index] }]
+        else
+          []
+        end
+      return { picks: [] } if raw.empty?
+
+      allowed = CharClass.selectable_by(@current_user).where(game: character.game)
+      picks = raw.map do |c|
+        char_class = allowed.find_by(index: c[:char_class_index])
+        return { errors: ["Class '#{c[:char_class_index]}' isn't available"] } unless char_class
+
+        { char_class: char_class, level: c[:level].to_i, subclass_index: c[:subclass_index].presence }
+      end
+
+      return { errors: ['Each class can only be taken once'] } if picks.map { |p| p[:char_class].id }.uniq.size != picks.size
+      return { errors: ['Class levels must be between 1 and 20'] } unless picks.all? { |p| p[:level].between?(1, 20) }
+      return { errors: ['Total character level cannot be above 20'] } if picks.sum { |p| p[:level] } > 20
+
+      { picks: picks }
+    end
+    private :requested_class_picks
+
     def update
       character = @current_user.characters.find(params[:id])
-      if character.update(character_params)
+      character.assign_attributes(character_params)
+      assign_char_race(character)
+      if character.save
         render json: character.as_json(methods: CHARACTER_METHODS), status: :ok
       else
-        render json: character.as_json(
-        methods: CHARACTER_METHODS,
-        include: {
-          profile_image: {
-            only: [
-              :id,
-              :url
-              ]
-          }
-        }
-      ), status: :created
+        render json: { errors: character.errors.full_messages }, status: :unprocessable_entity
       end
     rescue ActiveRecord::RecordNotFound
       render json: { error: 'Character not found' }, status: :not_found
@@ -110,6 +137,8 @@ class Api::V1::CharactersController < ApplicationController
     def campaign_characters
       campaign = Campaign.find(params[:campaign_id])
       characters = Character.where(campaign_id: campaign.id).includes(character_classes: :char_class)
+      # Until the DM approves a character's homebrew, only the DM sees it at the table.
+      characters = characters.playable unless campaign.user_id == @current_user.id
       render json: characters.as_json(methods: CHARACTER_METHODS, include: { profile_image: { only: [:id, :url] } }), status: :ok
       rescue ActiveRecord::RecordNotFound
         render json: { error: 'Campaign not found' }, status: :not_found
@@ -117,13 +146,30 @@ class Api::V1::CharactersController < ApplicationController
 
     private
 
+    # The race picker sends the race's index; the name string stays the
+    # display value (it includes the subrace). Unknown or someone else's
+    # homebrew race is ignored rather than linked.
+    def assign_char_race(character)
+      return unless params.key?(:char_race_index)
+
+      if params[:char_race_index].blank?
+        character.char_race = nil
+        character.subrace_index = nil
+      else
+        character.char_race = CharRace.selectable_by(@current_user).find_by(index: params[:char_race_index], game: character.game)
+        character.subrace_index = params[:subrace_index].presence
+      end
+    end
+
     def character_params
       params.permit(
         :name, :race, :level, :max_hp, :current_hp,
         :armor_class, :temp_hp, :temp_ac_bonus, :game, :strength, :dexterity,
         :constitution, :intelligence, :wisdom, :charisma,
-        :profile_image_id, :campaign_id, :gold, :inspo,
-        skills: []
+        :profile_image_id, :campaign_id, :gold, :inspo, :background,
+        skills: [],
+        languages: [],
+        feats: [:index, :name, :ability, :taken_at]
       )
     end
 end

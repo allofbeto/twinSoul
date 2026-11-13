@@ -30,8 +30,12 @@ Rails.application.routes.draw do
       end
       resources :image_assets, only: [:index, :create, :destroy]
       resources :monsters, only: [:index, :show]
-      resources :char_classes, only: [:index, :show]
-      resources :char_races, only: [:index, :show]
+      resources :char_classes, only: [:index, :show, :create, :update, :destroy]
+      resources :char_races, only: [:index, :show, :create, :update, :destroy]
+      get 'feats', to: 'feats#index'
+      post 'homebrew/import', to: 'homebrew_imports#create'
+      get 'campaigns/:campaign_id/homebrew_reviews', to: 'homebrew_reviews#index'
+      post 'characters/:character_id/homebrew_review', to: 'homebrew_reviews#create'
       resources :items
       resources :sessions, only: [:index, :create, :update, :destroy]
       resources :encounters

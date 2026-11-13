@@ -12,4 +12,13 @@ class User < ApplicationRecord
     has_many :campaigns, dependent: :destroy
     has_many :sessions, dependent: :destroy
     has_many :encounters, dependent: :destroy
+    has_many :homebrew_races, class_name: 'CharRace', dependent: :destroy
+    has_many :homebrew_classes, class_name: 'CharClass', dependent: :destroy
+
+    # Campaigns this user runs as DM or is an active player in.
+    def involved_campaign_ids
+      Campaign.where(user_id: id)
+              .or(Campaign.where(id: Player.where(user_id: id, active: true).select(:campaign_id)))
+              .pluck(:id)
+    end
 end

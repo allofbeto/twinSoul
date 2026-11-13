@@ -12,12 +12,15 @@ import AbilityScores from './Components/AbilityScores';
 import CharacterArtBox from './Components/CharacterArtBox';
 import CharacterSidebar from './Components/CharacterSidebar';
 import TabbedPanel from './Components/TabbedPanel';
+import { CharacterFeat } from './featTypes';
 import LevelUpWizard from './Components/LevelUpWizard';
 import MigrateInventory from '../../Items/MigrateItems';
 import { CharacterClassSummary } from './classTypes';
+import HomebrewStatusNotice, { HomebrewStatus } from './Components/HomebrewStatusNotice';
 
 interface Character {
   id: string;
+  background?: string | null;
   user_id: string;
   name: string;
   race: string;
@@ -38,11 +41,16 @@ interface Character {
   wisdom: number;
   charisma: number;
   skills: string[];
+  languages?: string[];
   profile_image_id: string;
   gold: number;
   inspo: number;
   campaign_id: string | null;
   campaign?: { id: string; name: string };
+  homebrew_status?: HomebrewStatus;
+  homebrew_review_note?: string | null;
+  homebrew_summary?: { kind: 'race' | 'class'; index: string; name: string; source_url: string | null }[];
+  feats?: CharacterFeat[];
 }
 
 interface CharacterDetailProps {
@@ -109,7 +117,7 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
 
   const saveCharacter = async (overrides: Partial<Character> = {}) => {
     const data = { ...form!, ...overrides };
-    await updateCharacter(id!, {
+    const res = await updateCharacter(id!, {
       name: data.name,
       race: data.race,
       level: data.level,
@@ -126,10 +134,17 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
       wisdom: data.wisdom,
       charisma: data.charisma,
       skills: data.skills,
+      languages: data.languages,
       profile_image_id: data.profile_image_id,
       gold: data.gold,
       inspo: data.inspo,
       campaign_id: data.campaign_id,
+    });
+    // Joining or leaving a campaign can change the homebrew review state.
+    setForm((prev) => prev && {
+      ...prev,
+      homebrew_status: res.data.homebrew_status,
+      homebrew_review_note: res.data.homebrew_review_note,
     });
   };
 
@@ -244,6 +259,7 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
         <CharacterTopBar
           name={form.name}
           race={form.race}
+          background={form.background}
           level={form.level}
           game={form.game}
           isDirty={isDirty && isOwner}
@@ -252,6 +268,16 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
           error={error}
           campaignId={form.campaign_id}
           onCampaignChange={handleCampaignChange}
+          homebrewStatus={form.homebrew_status}
+        />
+
+        <HomebrewStatusNotice
+          status={form.homebrew_status}
+          note={form.homebrew_review_note}
+          homebrew={form.homebrew_summary || []}
+          isOwner={isOwner}
+          campaignName={form.campaign?.name}
+          unsavedCampaignChange={isDirty}
         />
   
         <div className="character-overview">
@@ -295,6 +321,8 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
           />
           <TabbedPanel
             skills={form.skills}
+            languages={form.languages || []}
+            onLanguagesChange={is5e ? (languages) => { setIsDirty(true); setForm({ ...form, languages }); } : undefined}
             onToggleSkill={toggleSkill}
             abilityScores={{
               strength: form.strength,
@@ -306,6 +334,7 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
             }}
             proficiencyBonus={form.proficiency_bonus ?? (Math.ceil(form.level / 4) + 1)}
             characterId={form.id}
+            feats={form.feats || []}
             classSummaries={form.character_class_summaries || []}
             supportsClasses={is5e}
             isOwner={isOwner}
@@ -318,6 +347,7 @@ const CharacterDetail = ({ characterId }: CharacterDetailProps = {}) => {
         characterId={form.id}
         currentLevel={form.level}
         classSummaries={form.character_class_summaries || []}
+        feats={form.feats || []}
         abilityScores={{
           strength: form.strength,
           dexterity: form.dexterity,

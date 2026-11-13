@@ -33,10 +33,25 @@ export const getCharClass = (index: string, game: string = 'dnd_5e') => api.get(
 export const getCharRaces = (game: string = 'dnd_5e') => api.get(`/char_races?game=${game}`);
 export const getCharRace = (index: string, game: string = 'dnd_5e') => api.get(`/char_races/${index}?game=${game}`);
 
+// Homebrew races/classes (same endpoints as the SRD data; writes only touch your own)
+export const createHomebrewRace = (data: object) => api.post('/char_races', data);
+export const updateHomebrewRace = (index: string, data: object) => api.patch(`/char_races/${index}`, data);
+export const deleteHomebrewRace = (index: string) => api.delete(`/char_races/${index}`);
+export const createHomebrewClass = (data: object) => api.post('/char_classes', data);
+export const updateHomebrewClass = (index: string, data: object) => api.patch(`/char_classes/${index}`, data);
+export const deleteHomebrewClass = (index: string) => api.delete(`/char_classes/${index}`);
+export const importHomebrew = (url: string, kind: 'race' | 'class') => api.post('/homebrew/import', { url, kind });
+export const getHomebrewReviews = (campaignId: string) => api.get(`/campaigns/${campaignId}/homebrew_reviews`);
+export const reviewCharacterHomebrew = (characterId: string, decision: 'approve' | 'reject', note?: string) =>
+  api.post(`/characters/${characterId}/homebrew_review`, { decision, note });
+
 // Character classes (per-character multiclass entries) & leveling
 export const addCharacterClass = (characterId: string, data: object) => api.post(`/characters/${characterId}/character_classes`, data);
 export const updateCharacterClass = (characterId: string, id: string, data: object) => api.patch(`/characters/${characterId}/character_classes/${id}`, data);
 export const removeCharacterClass = (characterId: string, id: string) => api.delete(`/characters/${characterId}/character_classes/${id}`);
+// Feats (shared reference catalog)
+export const getFeats = (game: string = 'dnd_5e') => api.get('/feats', { params: { game } });
+
 export const levelUpCharacter = (characterId: string, data: object) => api.post(`/characters/${characterId}/level_up`, data);
 
 // Inventory
