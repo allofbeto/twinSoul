@@ -4,6 +4,7 @@ class CharacterClass < ApplicationRecord
 
   validates :level, numericality: { only_integer: true, greater_than: 0, less_than_or_equal_to: 20 }
   validate :references_a_class
+  validate :total_level_within_cap
 
   # Adding or dropping a homebrew class changes what the DM has to approve.
   after_save :refresh_character_homebrew_status, if: -> { homebrew_class_changed?(saved_change_to_char_class_id) }
@@ -22,6 +23,14 @@ class CharacterClass < ApplicationRecord
 
   def refresh_character_homebrew_status
     character.refresh_homebrew_status!
+  end
+
+  # A character tops out at level 20 across all their classes.
+  def total_level_within_cap
+    return unless character
+
+    others = character.character_classes.where.not(id: id).sum(:level)
+    errors.add(:level, 'would take the character above level 20') if others + level.to_i > 20
   end
 
   def references_a_class

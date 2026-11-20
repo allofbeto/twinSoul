@@ -7,6 +7,8 @@ class Api::V1::ItemsController < ApplicationController
                   :roll_kind, :check_with, :roll_bonus, :roll_expr, :roll_label,
                   { damages: [:mode, :dice_count, :dice_sides, :bonus, :ability, :flat, :text, :type] }].freeze
 
+  MIN_SEARCH_CHARS = 4
+
   include Authenticatable
   wrap_parameters false
 
@@ -80,6 +82,18 @@ class Api::V1::ItemsController < ApplicationController
     return render json: { error: 'Forbidden' }, status: :forbidden unless member?(campaign)
 
     items = Item.where(campaign_id: campaign.id)
+
+    # Name search. Everyone but the DM has to type at least MIN_SEARCH_CHARS
+    # of a name to see anything, so the DM's unrevealed items can't be browsed.
+    if params.key?(:q)
+      q = params[:q].to_s.strip
+      return render json: [], status: :ok if !owner?(campaign) && q.length < MIN_SEARCH_CHARS
+
+      items = items.where.not(kind: %w[monster encounter])
+      items = items.where('items.name ILIKE ?', "%#{Item.sanitize_sql_like(q)}%") if q.present?
+      return render json: items.order(:name).limit(25).map { |item| { id: item.id, name: item.name, kind: item.kind, inventory_id: item.inventory_id } }, status: :ok
+    end
+
     if owner?(campaign)
       render json: items, status: :ok
     else

@@ -26,6 +26,12 @@ class Character < ApplicationRecord
     validates :temp_ac_bonus, numericality: { only_integer: true }
     validates :game, inclusion: { in: SUPPORTED_GAMES }
     validates :homebrew_status, inclusion: { in: HOMEBREW_STATUSES }, allow_nil: true
+    validates :death_save_successes, :death_save_failures, numericality: { only_integer: true, in: 0..3 }
+    validates :inspo, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
+    validates :speed, numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
+
+    before_validation :sync_level_with_classes
+    before_validation :limit_expertise_to_skills
 
     after_save :refresh_homebrew_status!, if: :homebrew_review_inputs_changed?
 
@@ -127,6 +133,7 @@ class Character < ApplicationRecord
             'name' => record.name,
             'ability' => (feat[:ability] || feat['ability']).presence,
             'taken_at' => "#{char_class.name} #{cc.level}",
+            'source' => 'level',
           }.compact]
         end
 
@@ -146,6 +153,21 @@ class Character < ApplicationRecord
     end
 
     private
+
+    # A character with real classes is exactly as high level as its classes
+    # add up to; the level field only stands alone for class-less characters.
+    def sync_level_with_classes
+      return unless persisted?
+
+      total = character_classes.sum(:level)
+      self.level = total if total.positive?
+    end
+
+    # Expertise doubles a proficiency, so it only makes sense on a skill the
+    # character is proficient in.
+    def limit_expertise_to_skills
+      self.expertise = (expertise || []) & (skills || [])
+    end
 
     def homebrew_review_inputs_changed?
       return true if saved_change_to_campaign_id?

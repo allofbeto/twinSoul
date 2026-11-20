@@ -1,113 +1,100 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { DND_SKILLS } from '../constants';
+import { ABILITY_SHORT, AbilityKey, AbilityScoreSet, Overrides, SkillRank, passiveScore, skillBonus, skillRank } from '../sheetRules';
+import { OverridableNumber } from './sheet/fields';
 
 interface Props {
-  selected: string[];
-  onToggle: (skill: string) => void;
-  abilityScores: {
-    strength: number;
-    dexterity: number;
-    constitution: number;
-    intelligence: number;
-    wisdom: number;
-    charisma: number;
-  };
+  skills: string[];
+  expertise: string[];
+  scores: AbilityScoreSet;
   proficiencyBonus: number;
+  jackOfAllTrades: boolean;
+  /** Cycles none → proficient → expertise → none. */
+  onChange: (skills: string[], expertise: string[], skill: string) => void;
+  /** "skill:Stealth" and "passive:Perception" values set by hand. */
+  overrides: Overrides;
+  onOverride: (key: string, value: number | null, label: string) => void;
   isOwner: boolean;
+  children?: React.ReactNode; // extra panels under the list (languages)
 }
 
-const ABILITY_LABELS: Record<string, string> = {
-  strength: 'STR',
-  dexterity: 'DEX',
-  constitution: 'CON',
-  intelligence: 'INT',
-  wisdom: 'WIS',
-  charisma: 'CHA',
+const RANK_LABEL: Record<SkillRank, string> = {
+  none: 'Not proficient',
+  half: 'Half proficiency (Jack of All Trades)',
+  proficient: 'Proficient',
+  expertise: 'Expertise',
 };
 
-const getModifier = (score: number) => Math.floor((score - 10) / 2);
+const PASSIVES = ['Perception', 'Insight', 'Investigation'];
 
-const SkillSelector = ({ selected, onToggle, abilityScores, proficiencyBonus, isOwner }: Props) => {
-  const [openGroup, setOpenGroup] = useState<string>('dexterity');
-
-  const grouped = DND_SKILLS.reduce((acc, skill) => {
-    if (!acc[skill.ability]) acc[skill.ability] = [];
-    acc[skill.ability].push(skill);
-    return acc;
-  }, {} as Record<string, typeof DND_SKILLS>);
-
-  const toggleGroup = (ability: string) => {
-    setOpenGroup((prev) => (prev === ability ? '' : ability));
+const SkillSelector = ({ skills, expertise, scores, proficiencyBonus, jackOfAllTrades, onChange, overrides, onOverride, isOwner, children }: Props) => {
+  const cycle = (name: string) => {
+    if (expertise.includes(name)) {
+      onChange(skills.filter((s) => s !== name), expertise.filter((s) => s !== name), name);
+    } else if (skills.includes(name)) {
+      onChange(skills, [...expertise, name], name);
+    } else {
+      onChange([...skills, name], expertise, name);
+    }
   };
 
   return (
-    <div className="d-flex flex-column gap-2">
-      {/* Proficient skills summary */}
-      {selected.length > 0 && (
-        <div className="d-flex flex-wrap gap-1 mb-2">
-          {selected.map((skill) => (
-            <span key={skill} className="badge-cls" style={{ fontSize: '0.7rem' }}>
-              {skill}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {Object.entries(grouped).map(([ability, skills]) => {
-        const abilityMod = getModifier((abilityScores as any)[ability]);
-        const isOpen = openGroup === ability;
-        const proficientInGroup = skills.filter((s) => selected.includes(s.name));
-
-        return (
-          <div key={ability} className="skill-group">
-            {/* Group Header */}
-            <div
-              className="skill-group-header"
-              onClick={() => toggleGroup(ability)}
-            >
-              <div className="d-flex align-items-center gap-2">
-                <span className="skill-group-label">{ABILITY_LABELS[ability]}</span>
-                <span className="text-muted-theme" style={{ fontSize: '0.8rem' }}>
-                  {abilityMod >= 0 ? `+${abilityMod}` : abilityMod}
-                </span>
-                {!isOpen && proficientInGroup.length > 0 && (
-                  <span className="text-muted-theme" style={{ fontSize: '0.75rem' }}>
-                    — {proficientInGroup.map((s) => s.name).join(', ')}
-                  </span>
-                )}
-              </div>
-              <span className="text-muted-theme" style={{ fontSize: '0.75rem' }}>
-                {isOpen ? '▾' : '▸'}
+    <section className="sheet-card" aria-label="Skills">
+      <h3 className="sheet-card-title">
+        Skills
+        {isOwner && <span className="sheet-card-hint">tap to cycle proficiency</span>}
+      </h3>
+      <ul className="sheet-list">
+        {DND_SKILLS.map(({ name, ability }) => {
+          const rank = skillRank(name, skills, expertise, jackOfAllTrades);
+          const bonus = skillBonus(name, scores, skills, expertise, proficiencyBonus, jackOfAllTrades);
+          return (
+            <li key={name} className="sheet-list-row sheet-list-row--split">
+              <button
+                type="button"
+                className="sheet-list-toggle"
+                onClick={() => cycle(name)}
+                disabled={!isOwner}
+                title={RANK_LABEL[rank]}
+              >
+                <span className={`sheet-rank is-${rank}`} aria-label={RANK_LABEL[rank]} />
+                <span className="sheet-list-name">{name}</span>
+                <span className="sheet-list-ability">{ABILITY_SHORT[ability as AbilityKey]}</span>
+              </button>
+              <span className="sheet-list-bonus">
+                <OverridableNumber
+                  auto={bonus}
+                  value={overrides[`skill:${name}`]}
+                  signed
+                  editable={isOwner}
+                  onChange={(v) => onOverride(`skill:${name}`, v, name)}
+                  aria-label={`${name} bonus`}
+                />
               </span>
-            </div>
+            </li>
+          );
+        })}
+      </ul>
 
-            {/* Skills */}
-            {isOpen && (
-              <div>
-                {skills.map(({ name }) => {
-                  const isProficient = selected.includes(name);
-                  const bonus = isProficient ? abilityMod + proficiencyBonus : abilityMod;
-                  const bonusStr = bonus >= 0 ? `+${bonus}` : `${bonus}`;
-
-                  return (
-                    <div
-                      key={name}
-                      className="skill-row"
-                      onClick={() => isOwner && onToggle(name)}
-                      style={{ cursor: isOwner ? 'pointer' : 'default' }}
-                    >
-                      <div className={`skill-proficiency-dot ${isProficient ? 'active' : ''}`} />
-                      <span className="skill-name">{name}</span>
-                      <span className="skill-bonus">{bonusStr}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+      <div className="sheet-passives">
+        {PASSIVES.map((skill) => (
+          <div key={skill} className="sheet-passive">
+            <span className="sheet-passive-value">
+              <OverridableNumber
+                auto={10 + (overrides[`skill:${skill}`] ?? (passiveScore(skill, scores, skills, expertise, proficiencyBonus, jackOfAllTrades) - 10))}
+                value={overrides[`passive:${skill}`]}
+                editable={isOwner}
+                onChange={(v) => onOverride(`passive:${skill}`, v, `passive ${skill}`)}
+                aria-label={`Passive ${skill}`}
+              />
+            </span>
+            <span className="sheet-label">Passive {skill}</span>
           </div>
-        );
-      })}
-    </div>
+        ))}
+      </div>
+
+      {children}
+    </section>
   );
 };
 

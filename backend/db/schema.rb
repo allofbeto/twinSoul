@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_11_13_150000) do
+ActiveRecord::Schema[7.0].define(version: 2026_11_16_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -127,6 +127,19 @@ ActiveRecord::Schema[7.0].define(version: 2026_11_13_150000) do
     t.jsonb "feats", default: [], null: false
     t.string "background"
     t.string "languages", default: [], null: false, array: true
+    t.text "notes"
+    t.integer "speed"
+    t.string "expertise", default: [], null: false, array: true
+    t.integer "death_save_successes", default: 0, null: false
+    t.integer "death_save_failures", default: 0, null: false
+    t.jsonb "hit_dice_used", default: {}, null: false
+    t.jsonb "spell_slots_used", default: {}, null: false
+    t.jsonb "resources_used", default: {}, null: false
+    t.jsonb "overrides", default: {}, null: false
+    t.jsonb "custom_trackers", default: [], null: false
+    t.jsonb "actions", default: [], null: false
+    t.jsonb "spells", default: [], null: false
+    t.jsonb "feature_choices", default: [], null: false
     t.index ["campaign_id"], name: "index_characters_on_campaign_id"
     t.index ["char_race_id"], name: "index_characters_on_char_race_id"
     t.index ["homebrew_reviewed_by_id"], name: "index_characters_on_homebrew_reviewed_by_id"
@@ -319,6 +332,31 @@ ActiveRecord::Schema[7.0].define(version: 2026_11_13_150000) do
     t.datetime "updated_at", null: false
     t.index ["campaign_id"], name: "index_sessions_on_campaign_id"
     t.index ["user_id"], name: "index_sessions_on_user_id"
+  end
+
+  create_table "spells", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "game", default: "dnd_5e", null: false
+    t.string "index", null: false
+    t.string "name", null: false
+    t.integer "level", default: 0, null: false
+    t.string "school"
+    t.string "casting_time"
+    t.string "range"
+    t.string "components", default: [], array: true
+    t.text "material"
+    t.string "duration"
+    t.boolean "concentration", default: false, null: false
+    t.boolean "ritual", default: false, null: false
+    t.string "attack_type"
+    t.text "desc", default: [], array: true
+    t.text "higher_level", default: [], array: true
+    t.string "class_indexes", default: [], array: true
+    t.string "subclass_indexes", default: [], array: true
+    t.string "source", default: "SRD 5.1"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["class_indexes"], name: "index_spells_on_class_indexes", using: :gin
+    t.index ["game", "index"], name: "index_spells_on_game_and_index", unique: true
   end
 
   create_table "tracks", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

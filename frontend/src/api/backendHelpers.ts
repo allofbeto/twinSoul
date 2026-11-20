@@ -16,6 +16,8 @@ export const deleteCampaign = (id: string) => api.delete(`/campaigns/${id}`);
 
 export const getCampaignCharacters = (campaignId: string) => api.get(`/campaigns/${campaignId}/characters`);
 export const getCampaignItems = (campaignId: string) => api.get(`/campaigns/${campaignId}/items`);
+/** Name search: non-DMs get nothing until the query has 4+ characters, and only names back. */
+export const searchCampaignItems = (campaignId: string, q: string) => api.get(`/campaigns/${campaignId}/items`, { params: { q } });
 export const createCampaignItem = (campaignId: string, data: object) => api.post(`/campaigns/${campaignId}/items`, data);
 
 // Characters
@@ -51,6 +53,7 @@ export const updateCharacterClass = (characterId: string, id: string, data: obje
 export const removeCharacterClass = (characterId: string, id: string) => api.delete(`/characters/${characterId}/character_classes/${id}`);
 // Feats (shared reference catalog)
 export const getFeats = (game: string = 'dnd_5e') => api.get('/feats', { params: { game } });
+export const getSpells = (game: string = 'dnd_5e') => api.get('/spells', { params: { game } });
 
 export const levelUpCharacter = (characterId: string, data: object) => api.post(`/characters/${characterId}/level_up`, data);
 

@@ -172,12 +172,13 @@ const RESOURCE_LABELS: Record<string, string> = {
 
 const formatCr = (cr: number) => (cr === 0.25 ? '1/4' : cr === 0.5 ? '1/2' : cr === 0.125 ? '1/8' : `${cr}`);
 
-export const classResources = (cls: CharClass, level: number): { label: string; value: string }[] => {
+/** `skip`: class_specific keys to leave out (e.g. ones the sheet tracks as counters). */
+export const classResources = (cls: CharClass, level: number, skip?: Set<string>): { label: string; value: string }[] => {
   const data = getClassLevelData(cls, level)?.class_specific || {};
   const out: { label: string; value: string }[] = [];
   Object.entries(data).forEach(([key, raw]) => {
     const label = RESOURCE_LABELS[key];
-    if (!label) return;
+    if (!label || skip?.has(key)) return;
     const v: any = raw;
     if (v === null || v === undefined || v === 0 || v === false) return;
     let value: string;

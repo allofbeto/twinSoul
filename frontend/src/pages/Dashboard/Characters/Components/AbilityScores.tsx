@@ -1,129 +1,84 @@
 import React from 'react';
-import { ABILITY_SCORES } from '../constants';
+import { NumberField, OverridableNumber } from './sheet/fields';
+import { ABILITY_KEYS, ABILITY_SHORT, AbilityKey, AbilityScoreSet, abilityMod, signed } from '../sheetRules';
 
-interface Props {
-  form: {
-    strength: number;
-    dexterity: number;
-    constitution: number;
-    intelligence: number;
-    wisdom: number;
-    charisma: number;
-  };
-  handleNumberChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  isOwner: boolean;
+export interface SaveRow {
+  key: AbilityKey;
+  proficient: boolean;
+  /** What the class rules say, to tell a hand-set proficiency apart. */
+  autoProficient: boolean;
+  auto: number;
+  value: number | undefined;
 }
 
-const getModifier = (score: number) => {
-  const mod = Math.floor((score - 10) / 2);
-  return mod >= 0 ? `+${mod}` : `${mod}`;
-};
+interface Props {
+  scores: AbilityScoreSet;
+  saves: SaveRow[];
+  onScoreChange: (ability: AbilityKey, value: number) => void;
+  onSaveProficiencyToggle: (ability: AbilityKey) => void;
+  onSaveOverride: (ability: AbilityKey, value: number | null) => void;
+  isOwner: boolean;
+  showSaves: boolean;
+}
 
-const RadarChart = ({ form }: { form: Props['form'] }) => {
-  const size = 220;
-  const center = size / 2;
-  const maxValue = 30;
-  const levels = 5;
-  const keys = ABILITY_SCORES.map(({ key }) => key);
-  const labels = ABILITY_SCORES.map(({ label }) => label);
-  const numAxes = keys.length;
-  const angleOffset = -Math.PI / 2;
-  const maxRadius = center - 35;
-
-  const getPoint = (index: number, radius: number) => {
-    const angle = (index * 2 * Math.PI) / numAxes + angleOffset;
-    return {
-      x: center + radius * Math.cos(angle),
-      y: center + radius * Math.sin(angle),
-    };
-  };
-
-  const gridPolygons = Array.from({ length: levels }, (_, i) => {
-    const r = (maxRadius * (i + 1)) / levels;
-    return keys.map((_, idx) => {
-      const p = getPoint(idx, r);
-      return `${p.x},${p.y}`;
-    }).join(' ');
-  });
-
-  const axes = keys.map((_, idx) => {
-    const p = getPoint(idx, maxRadius);
-    return { x1: center, y1: center, x2: p.x, y2: p.y };
-  });
-
-  const dataPoints = keys.map((key, idx) => {
-    const value = (form as any)[key];
-    const r = (value / maxValue) * maxRadius;
-    return getPoint(idx, r);
-  });
-
-  const labelPoints = labels.map((label, idx) => {
-    const score = (form as any)[keys[idx]];
-    const mod = getModifier(score);
-    const p = getPoint(idx, maxRadius + 22);
-    return { label, mod, x: p.x, y: p.y };
-  });
-
-  return (
-    <svg width={size} height={size}>
-      {gridPolygons.map((points, i) => (
-        <polygon key={i} points={points} fill="none" stroke="var(--color-border)" strokeWidth={1} />
-      ))}
-      {axes.map((axis, i) => (
-        <line key={i} x1={axis.x1} y1={axis.y1} x2={axis.x2} y2={axis.y2} stroke="var(--color-border)" strokeWidth={1} />
-      ))}
-      <polygon
-        points={dataPoints.map((p) => `${p.x},${p.y}`).join(' ')}
-        fill="var(--color-primary)"
-        fillOpacity={0.25}
-        stroke="var(--color-primary)"
-        strokeWidth={2}
-      />
-      {dataPoints.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={4} fill="var(--color-primary)" />
-      ))}
-      {labelPoints.map(({ label, mod, x, y }, i) => (
-        <text key={i} x={x} textAnchor="middle" fill="var(--color-text-muted)" fontSize={10}>
-          <tspan x={x} dy={y - 6} dominantBaseline="middle" fontWeight={600}>{label}</tspan>
-          <tspan x={x} dy={14} dominantBaseline="middle" fill="var(--color-primary)" fontWeight={700}>{mod}</tspan>
-        </text>
-      ))}
-    </svg>
-  );
-};
-
-const AbilityScores = ({ form, handleNumberChange, isOwner }: Props) => {
-  return (
-    <div className="card-theme p-4 mb-4 h-100">
-      <h5 className="text-theme mb-3">Ability Scores</h5>
-      <div className="d-flex flex-column align-items-center gap-4">
-
-        {/* Radar Chart */}
-        <RadarChart form={form} />
-
-        {/* Inputs - 2 rows of 3 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', width: '100%' }}>
-          {ABILITY_SCORES.map(({ key, label }) => (
-            <div key={key} style={{ textAlign: 'center' }}>
-              <label className="form-label text-muted-theme text-center d-block">{label}</label>
-              <input
-                type="number"
-                name={key}
-                className="form-control input-theme text-center"
-                min={1}
-                max={30}
-                value={(form as any)[key]}
-                onChange={handleNumberChange}
-                disabled={!isOwner}
-              />
-              <small className="text-muted-theme">{getModifier((form as any)[key])}</small>
-            </div>
-          ))}
+// Each ability once: the modifier is what you roll with, so it's the big
+// number; the score underneath is what you edit. Saving throws sit below:
+// tap the dot to change proficiency, tap the number to set it by hand.
+const AbilityScores = ({ scores, saves, onScoreChange, onSaveProficiencyToggle, onSaveOverride, isOwner, showSaves }: Props) => (
+  <section className="sheet-card" aria-label="Ability scores">
+    <h3 className="sheet-card-title">Abilities</h3>
+    <div className="sheet-abilities">
+      {ABILITY_KEYS.map((key) => (
+        <div key={key} className="sheet-ability">
+          <span className="sheet-ability-name">{ABILITY_SHORT[key]}</span>
+          <span className="sheet-ability-mod">{signed(abilityMod(scores[key]))}</span>
+          <NumberField
+            className="sheet-ability-score"
+            min={1}
+            max={30}
+            value={scores[key]}
+            onCommit={(n) => onScoreChange(key, n)}
+            disabled={!isOwner}
+            aria-label={`${key} score`}
+          />
         </div>
-
-      </div>
+      ))}
     </div>
-  );
-};
+
+    {showSaves && (
+      <>
+        <h3 className="sheet-card-title mt-3">Saving Throws</h3>
+        <ul className="sheet-list">
+          {saves.map((s) => (
+            <li key={s.key} className="sheet-list-row">
+              <button
+                type="button"
+                className={`sheet-rank-btn ${s.proficient !== s.autoProficient ? 'is-custom' : ''}`}
+                onClick={() => onSaveProficiencyToggle(s.key)}
+                disabled={!isOwner}
+                title={s.proficient !== s.autoProficient ? 'Proficiency set by hand' : (s.proficient ? 'Proficient' : 'Not proficient')}
+                aria-label={`${ABILITY_SHORT[s.key]} save: ${s.proficient ? 'proficient' : 'not proficient'}`}
+                aria-pressed={s.proficient}
+              >
+                <span className={`sheet-rank ${s.proficient ? 'is-proficient' : ''}`} />
+              </button>
+              <span className="sheet-list-name">{ABILITY_SHORT[s.key]}</span>
+              <span className="sheet-list-bonus">
+                <OverridableNumber
+                  auto={s.auto}
+                  value={s.value}
+                  signed
+                  editable={isOwner}
+                  onChange={(v) => onSaveOverride(s.key, v)}
+                  aria-label={`${ABILITY_SHORT[s.key]} saving throw bonus`}
+                />
+              </span>
+            </li>
+          ))}
+        </ul>
+      </>
+    )}
+  </section>
+);
 
 export default AbilityScores;

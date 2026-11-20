@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { getItem, updateItem, deleteItem } from '../../../api/backendHelpers';
 import RichTextEditor from '../../../components/formComponents/RichTextEditor';
-import AbilityScores from '../Characters/Components/AbilityScores';
+import AbilityScores from '../Characters/Components/AbilityScoresRadar';
 import MonsterTopBar from './Components/MonsterTopBar';
 import MonsterArtBox from './Components/MonsterArtBox';
 import TraitListEditor, { TraitEntry } from './Components/TraitListEditor';

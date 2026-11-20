@@ -13,12 +13,27 @@ export interface Feat {
 }
 
 // A feat a character has taken.
+export type FeatSource = 'class' | 'race' | 'level' | 'other';
+
 export interface CharacterFeat {
-  index: string;
+  index: string; // catalog index, or "custom-..." for the table's own feats
   name: string;
   ability?: string; // ability code raised by the feat, if any
   taken_at?: string; // e.g. "Fighter 4"
+  /** Where it came from. Older feats have none: an ASI ("taken_at") counts as level. */
+  source?: FeatSource;
+  /** The table's own feats carry their text here. */
+  desc?: string;
 }
+
+export const FEAT_SOURCES: { key: FeatSource; label: string; hint: string }[] = [
+  { key: 'class', label: 'Class', hint: 'Granted by a class or subclass feature' },
+  { key: 'race', label: 'Race', hint: 'From your race, e.g. Variant Human' },
+  { key: 'level', label: 'Level', hint: 'Taken instead of an Ability Score Improvement' },
+  { key: 'other', label: 'Other', hint: 'Backgrounds, boons, DM rewards, house rules' },
+];
+
+export const featSource = (f: CharacterFeat): FeatSource => f.source || (f.taken_at ? 'level' : 'other');
 
 const featCache = createReferenceCache<Feat>(getFeats);
 

@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
+import { NarrowContext } from '../useNarrow';
+import { useDockAction } from '../dockAction';
 import { getInventoryItems, addInventoryItem, removeInventoryItem } from '../../../../api/backendHelpers';
 
 interface Item {
@@ -28,6 +30,13 @@ const InventoryTable = ({ characterId }: Props) => {
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
     const [expanded, setExpanded] = useState<string | null>(null);
     const [showAddForm, setShowAddForm] = useState(false);
+    const narrow = useContext(NarrowContext);
+    const formRef = useRef<HTMLDivElement>(null);
+    // On phones the add button lives in the dock beside undo / redo.
+    useDockAction(narrow ? 'Add' : null, () => setShowAddForm(true));
+    useEffect(() => {
+      if (showAddForm) formRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }, [showAddForm]);
     const [quantities, setQuantities] = useState<Record<string, number>>({});
     const [newItem, setNewItem] = useState({
         name: '',
@@ -141,6 +150,7 @@ const InventoryTable = ({ characterId }: Props) => {
             <option key={cat} value={cat}>{cat}</option>
             ))}
         </select>
+        {!narrow && (
         <button
             type="button"
             className="btn btn-theme-primary btn-sm"
@@ -149,11 +159,12 @@ const InventoryTable = ({ characterId }: Props) => {
         >
             {showAddForm ? 'Cancel' : '+ Add Item'}
         </button>
+        )}
         </div>
 
         {/* Add Form */}
         {showAddForm && (
-        <div className="card-theme p-3 mb-3">
+        <div ref={formRef} className="card-theme p-3 mb-3">
             <h6 className="text-theme mb-3">New Item</h6>
             <div className="d-flex gap-2 mb-2 flex-wrap">
             <input
@@ -207,6 +218,11 @@ const InventoryTable = ({ characterId }: Props) => {
             >
             Save Item
             </button>
+            {narrow && (
+              <button type="button" className="btn btn-outline-secondary btn-sm ms-2" onClick={() => setShowAddForm(false)}>
+                Cancel
+              </button>
+            )}
         </div>
         )}
 

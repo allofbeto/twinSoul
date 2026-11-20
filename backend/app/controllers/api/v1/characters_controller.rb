@@ -3,6 +3,7 @@ class Api::V1::CharactersController < ApplicationController
     wrap_parameters false
   
     CHARACTER_METHODS = [:classes, :character_class_summaries, :proficiency_bonus, :homebrew_summary].freeze
+    CHAR_RACE_FIELDS = { only: [:index, :name, :user_id, :speed, :icon] }.freeze
 
     def index
       characters = @current_user.characters.includes(character_classes: :char_class)
@@ -23,10 +24,11 @@ class Api::V1::CharactersController < ApplicationController
           campaign: {
             only: [
               :id,
-              :name
+              :name,
+              :user_id
             ]
           },
-          char_race: { only: [:index, :name, :user_id] }
+          char_race: CHAR_RACE_FIELDS
         }
       ), status: :ok
     rescue ActiveRecord::RecordNotFound
@@ -102,7 +104,7 @@ class Api::V1::CharactersController < ApplicationController
       character.assign_attributes(character_params)
       assign_char_race(character)
       if character.save
-        render json: character.as_json(methods: CHARACTER_METHODS), status: :ok
+        render json: character.as_json(methods: CHARACTER_METHODS, include: { char_race: CHAR_RACE_FIELDS }), status: :ok
       else
         render json: { errors: character.errors.full_messages }, status: :unprocessable_entity
       end
@@ -167,9 +169,20 @@ class Api::V1::CharactersController < ApplicationController
         :armor_class, :temp_hp, :temp_ac_bonus, :game, :strength, :dexterity,
         :constitution, :intelligence, :wisdom, :charisma,
         :profile_image_id, :campaign_id, :gold, :inspo, :background,
+        :notes, :speed, :death_save_successes, :death_save_failures,
         skills: [],
+        expertise: [],
+        hit_dice_used: {},
+        spell_slots_used: {},
+        resources_used: {},
+        overrides: {},
+        custom_trackers: [:id, :label, :total, :used, :recharge],
         languages: [],
-        feats: [:index, :name, :ability, :taken_at]
+        feats: [:index, :name, :ability, :taken_at, :source, :desc],
+        feature_choices: [:id, :group, :index, :name, :source, :desc],
+        actions: [:id, :name, :kind, :cast_time, :spell_level, :attack, :damage, :range, :notes],
+        spells: [:index, :name, :level, :source, :prepared, :custom, :school, :casting_time, :range, :duration, :notes,
+                 { source_ref: [:id, :name, :kind] }]
       )
     end
 end

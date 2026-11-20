@@ -4,7 +4,7 @@ import { createCharacter, createImageAsset } from '../../../../api/backendHelper
 import { useCharClasses, findCharClass } from '../useCharClasses';
 import { useCharRaces, findCharRace } from '../useCharRaces';
 import { getClassAuraHue, CharClass, asiLevelsUpTo, classResources, getFeaturesGainedAt, requiresSubclassChoiceAt } from '../classTypes';
-import { raceIconKey } from '../raceTypes';
+import { raceIconKey, raceLabel as formatRaceLabel } from '../raceTypes';
 import { toughHpBonus, useFeats } from '../featTypes';
 import ClassIcon, { classIconKey } from '../Components/ClassIcon';
 import RaceIconPicker from '../Components/RaceIconPicker';
@@ -19,6 +19,10 @@ import BackgroundStep from './BackgroundStep';
 import TalentsStep from './TalentsStep';
 import { findBackground } from './backgrounds';
 import { buildLanguageSources, buildSkillSources, sanitizeLanguagePicks, sanitizePicks } from './skillSources';
+import SpellChooser from '../Components/sheet/SpellChooser';
+import { CharacterSpell, useSpells } from '../spellTypes';
+import { buildSpellSources, choicesLeft, sourceUsage } from '../spellRules';
+import '../../../../styles/characterSheet.css';
 import {
   ABILITY_KEYS,
   ABILITY_META,
@@ -44,7 +48,7 @@ import {
 import '../../../../styles/characterCreation.css';
 import '../../../../styles/homebrew.css';
 
-type Step = 'origin' | 'calling' | 'might' | 'past' | 'talents' | 'legend';
+type Step = 'origin' | 'calling' | 'might' | 'past' | 'talents' | 'magic' | 'legend';
 
 const STEPS: { key: Step; label: string; title: string; prompt: string }[] = [
   { key: 'origin', label: 'Origin', title: 'Where do you come from?', prompt: 'Your people shape your body, senses and gifts.' },
@@ -52,6 +56,7 @@ const STEPS: { key: Step; label: string; title: string; prompt: string }[] = [
   { key: 'might', label: 'Might', title: 'Where does your strength lie?', prompt: 'Six abilities define what you do best and where you struggle.' },
   { key: 'past', label: 'Past', title: 'What did you do before?', prompt: 'Your background is the life you led before adventure found you.' },
   { key: 'talents', label: 'Talents', title: 'What have you learned?', prompt: 'Skills and languages from your people, your past and every class you follow.' },
+  { key: 'magic', label: 'Magic', title: 'What magic do you wield?', prompt: 'Spells from your class, your people and your feats. You can change them on the sheet any time.' },
   { key: 'legend', label: 'Legend', title: 'Who are you?', prompt: 'Every legend starts with a name.' },
 ];
 
@@ -66,6 +71,8 @@ const Dnd5eCharacterWizard = ({ onBack }: Props) => {
   const charClasses = allClasses.filter((c) => isSelectableBy(c, user?.id));
   const { races: charRaces } = useCharRaces('dnd_5e');
   const { feats: featCatalog } = useFeats('dnd_5e');
+  const { spells: spellCatalog, loading: spellsLoading } = useSpells('dnd_5e');
+  const [builderSpells, setBuilderSpells] = useState<CharacterSpell[]>([]);
 
   const [step, setStepRaw] = useState<Step>('origin');
   const [visited, setVisited] = useState<Set<Step>>(() => new Set<Step>(['origin']));
@@ -216,6 +223,27 @@ const Dnd5eCharacterWizard = ({ onBack }: Props) => {
         .map(({ cls: c, req }) => `${c.name} needs ${req!.label}`)
     : [];
 
+  // Spells: the same sources the sheet uses, worked out from the choices so far.
+  const spellSources = buildSpellSources({
+    entries: chosen.map(({ pick, cls: c }) => ({
+      cls: c,
+      summary: { id: c.index, level: pick.level, subclass_index: pick.subclassIndex || null, char_class_index: c.index, char_class_name: c.name, custom_name: null },
+    })),
+    raceIndex: raceIndex || null,
+    subraceIndex: subraceIndex || null,
+    feats: takenFeats,
+    level,
+    scores: finalScores,
+    proficiencyBonus: Math.ceil(level / 4) + 1,
+  });
+  const magicSources = spellSources.filter((src) =>
+    src.key !== 'other' && (src.cantrips > 0 || src.spells > 0 || (src.prepares || 0) > 0 || src.granted.length > 0));
+  const hasMagic = magicSources.length > 0;
+  // Spells whose source went away (class removed, race changed) drop out.
+  const keptSpells = builderSpells.filter((sp) => magicSources.some((src) => src.key === sp.source));
+  const spellsLeft = magicSources.reduce((n, src) => n + choicesLeft(src, sourceUsage(src, keptSpells)), 0);
+  const steps = STEPS.filter((st) => st.key !== 'magic' || hasMagic);
+
   // A new class re-lays the starting scores around its key abilities, unless
   // the player has already arranged the scores themselves.
   const primaryKey = primaryAbilities.join(',');
@@ -223,8 +251,8 @@ const Dnd5eCharacterWizard = ({ onBack }: Props) => {
     if (method === 'custom' && !scoresArranged) setBase(suggestedArray(cls, undefined, primaryKey ? (primaryKey.split(',') as AbilityKey[]) : undefined));
   }, [cls, primaryKey, method, scoresArranged]);
 
-  const stepIndex = STEPS.findIndex((s) => s.key === step);
-  const current = STEPS[stepIndex];
+  const stepIndex = Math.max(0, steps.findIndex((s) => s.key === step));
+  const current = steps[stepIndex];
 
   const done: Record<Step, boolean> = {
     origin: !!race && (race.subraces.length === 0 || !!subrace),
@@ -232,13 +260,14 @@ const Dnd5eCharacterWizard = ({ onBack }: Props) => {
     might: visited.has('might') && (method !== 'roll' || !!rolls) && asiChoices.every(asiIsComplete),
     past: !!background,
     talents: visited.has('talents') && skillsChosen === skillsToChoose && languagesChosen === languagesToChoose,
+    magic: visited.has('magic') && spellsLeft === 0,
     legend: name.trim().length > 0,
   };
   const canAdvance = step === 'origin' ? done.origin : step === 'calling' ? done.calling : step === 'might' ? done.might : step === 'past' ? done.past : true;
 
   const goTo = (target: Step) => setStep(target);
-  const goNext = () => canAdvance && STEPS[stepIndex + 1] && setStep(STEPS[stepIndex + 1].key);
-  const goBack = () => (STEPS[stepIndex - 1] ? setStep(STEPS[stepIndex - 1].key) : onBack());
+  const goNext = () => canAdvance && steps[stepIndex + 1] && setStep(steps[stepIndex + 1].key);
+  const goBack = () => (steps[stepIndex - 1] ? setStep(steps[stepIndex - 1].key) : onBack());
 
   const railValue = (key: Step) => {
     switch (key) {
@@ -247,6 +276,7 @@ const Dnd5eCharacterWizard = ({ onBack }: Props) => {
       case 'might': return !visited.has('might') ? '—' : primaryAbilities.length ? primaryAbilities.slice(0, 2).map((k) => `${ABILITY_META[k].short} ${finalScores[k]}`).join(' · ') : 'Set';
       case 'past': return backgroundName || '—';
       case 'talents': return visited.has('talents') ? `${skills.length} skills` : '—';
+      case 'magic': return visited.has('magic') ? `${keptSpells.length} spells` : '—';
       case 'legend': return name || '—';
       default: return '';
     }
@@ -301,6 +331,7 @@ const Dnd5eCharacterWizard = ({ onBack }: Props) => {
         languages,
         background: backgroundName,
         feats: takenFeats,
+        spells: keptSpells,
         char_race_index: raceIndex || undefined,
         subrace_index: subraceIndex || undefined,
         classes: picks.map((p) => ({
@@ -324,8 +355,8 @@ const Dnd5eCharacterWizard = ({ onBack }: Props) => {
     <div className={`builder ${forging ? 'is-forging' : ''}`} style={{ ['--builder-hue' as any]: hue }}>
       <div className="creation-layout">
         <nav className="creation-rail" aria-label="Character steps">
-          {STEPS.map((s, i) => {
-            const reachable = visited.has(s.key) || i <= stepIndex || STEPS.slice(0, i).every((p) => done[p.key] || p.key === 'talents');
+          {steps.map((s, i) => {
+            const reachable = visited.has(s.key) || i <= stepIndex || steps.slice(0, i).every((p) => done[p.key] || p.key === 'talents' || p.key === 'magic');
             return (
               <button
                 key={s.key}
@@ -347,7 +378,7 @@ const Dnd5eCharacterWizard = ({ onBack }: Props) => {
 
         <section className="builder-stage" aria-live="polite">
           <header className="builder-heading" key={step}>
-            <div className="builder-eyebrow">Step {stepIndex + 1} of {STEPS.length} · {current.label}</div>
+            <div className="builder-eyebrow">Step {stepIndex + 1} of {steps.length} · {current.label}</div>
             <h2 className="builder-title">{current.title}</h2>
             <p className="builder-prompt">{current.prompt}</p>
           </header>
@@ -363,12 +394,7 @@ const Dnd5eCharacterWizard = ({ onBack }: Props) => {
                   if (idx !== raceIndex) setChosenBonuses([]);
                   setRaceIndex(idx);
                   setSubraceIndex(subIdx || '');
-                  // "Hill Dwarf" rather than "Dwarf (Hill Dwarf)"; "Beasthide Shifter" for subraces that don't name the race.
-                  setRaceLabel(
-                    !subraceName ? raceName
-                      : subraceName.toLowerCase().includes(raceName.toLowerCase()) ? subraceName
-                      : `${subraceName} ${raceName}`,
-                  );
+                  setRaceLabel(formatRaceLabel(raceName, subraceName));
                 }}
               />
             )}
@@ -572,6 +598,30 @@ const Dnd5eCharacterWizard = ({ onBack }: Props) => {
               />
             )}
 
+            {step === 'magic' && (
+              <div className="builder-magic">
+                {magicSources.map((src) => (
+                  <section key={src.key} className="sheet-spell-source">
+                    <header className="sheet-spell-source-head">
+                      <div className="sheet-spell-source-title"><strong>{src.label}</strong></div>
+                    </header>
+                    {src.mode === 'prepared' && (
+                      <p className="sheet-form-hint mb-2">
+                        You prepare spells from the whole {src.label.split(' · ')[0]} list each day. Pick your cantrips now, and prepare spells now or on the sheet.
+                      </p>
+                    )}
+                    <SpellChooser
+                      source={src}
+                      chosen={keptSpells}
+                      catalog={spellCatalog}
+                      loading={spellsLoading}
+                      onChange={(next) => setBuilderSpells(next)}
+                    />
+                  </section>
+                ))}
+              </div>
+            )}
+
             {step === 'legend' && (
               <div className="builder-legend">
                 <div className="builder-name-row">
@@ -643,6 +693,7 @@ const Dnd5eCharacterWizard = ({ onBack }: Props) => {
                   {skills.length > 0 && <div className="builder-hero-skills">Trained in {skills.join(', ')}</div>}
                   {languages.length > 0 && <div className="builder-hero-skills">Speaks {languages.join(', ')}</div>}
                   {takenFeats.length > 0 && <div className="builder-hero-skills">Feats: {takenFeats.map((ft) => ft.name).join(', ')}</div>}
+                  {keptSpells.length > 0 && <div className="builder-hero-skills">Spells: {keptSpells.map((sp) => sp.name).join(', ')}</div>}
                   <p className="text-muted-theme mb-0 mt-2" style={{ fontSize: '0.75rem' }}>
                     HP and AC are worked out from your class, Constitution and Dexterity (no armour). You can change anything on the character sheet.
                   </p>
@@ -669,7 +720,7 @@ const Dnd5eCharacterWizard = ({ onBack }: Props) => {
             </button>
             {step !== 'legend' ? (
               <button type="button" className="btn btn-theme-primary" onClick={goNext} disabled={!canAdvance}>
-                {step === 'origin' && !race ? 'Choose a race' : step === 'origin' && !done.origin ? 'Choose a lineage' : step === 'calling' && !cls ? 'Choose a class' : step === 'calling' && subclassMissing.length ? `Choose a ${subclassMissing[0].cls.subclasses[0]?.subclass_flavor || 'subclass'}` : step === 'might' && !asiChoices.every(asiIsComplete) ? 'Choose improvements' : step === 'past' && !background ? 'Choose a background' : step === 'talents' && skillsChosen + languagesChosen < skillsToChoose + languagesToChoose ? `Continue (${skillsToChoose + languagesToChoose - skillsChosen - languagesChosen} unchosen)` : 'Continue'}
+                {step === 'origin' && !race ? 'Choose a race' : step === 'origin' && !done.origin ? 'Choose a lineage' : step === 'calling' && !cls ? 'Choose a class' : step === 'calling' && subclassMissing.length ? `Choose a ${subclassMissing[0].cls.subclasses[0]?.subclass_flavor || 'subclass'}` : step === 'might' && !asiChoices.every(asiIsComplete) ? 'Choose improvements' : step === 'past' && !background ? 'Choose a background' : step === 'talents' && skillsChosen + languagesChosen < skillsToChoose + languagesToChoose ? `Continue (${skillsToChoose + languagesToChoose - skillsChosen - languagesChosen} unchosen)` : step === 'magic' && spellsLeft > 0 ? `Continue (${spellsLeft} unchosen)` : 'Continue'}
               </button>
             ) : (
               <button type="button" className="btn btn-theme-primary builder-forge" onClick={handleForge} disabled={forging || !name.trim()}>

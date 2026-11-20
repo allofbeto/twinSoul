@@ -1,4 +1,4 @@
-import SkillSelector from '../../Characters/Components/SkillSelector';
+import SkillSelector from '../../Characters/Components/GroupedSkillSelector';
 import { proficiencyForCr } from '../statblock';
 
 interface Props {

@@ -33,6 +33,7 @@ Rails.application.routes.draw do
       resources :char_classes, only: [:index, :show, :create, :update, :destroy]
       resources :char_races, only: [:index, :show, :create, :update, :destroy]
       get 'feats', to: 'feats#index'
+      get 'spells', to: 'spells#index'
       post 'homebrew/import', to: 'homebrew_imports#create'
       get 'campaigns/:campaign_id/homebrew_reviews', to: 'homebrew_reviews#index'
       post 'characters/:character_id/homebrew_review', to: 'homebrew_reviews#create'

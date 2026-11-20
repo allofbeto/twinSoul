@@ -11,6 +11,6 @@ bundle exec rails runner 'load Rails.root.join("db/seeds.rb") if Monster.none? |
 
 # Published (non-SRD) races, subclasses, classes and feats: a quick upsert, so it runs on every deploy
 # and picks up edits to the files in db/seeds/data/.
-bundle exec rails runner 'load Rails.root.join("db/seeds/published_races.rb"); load Rails.root.join("db/seeds/published_content.rb")'
+bundle exec rails runner 'load Rails.root.join("db/seeds/published_races.rb"); load Rails.root.join("db/seeds/published_content.rb"); load Rails.root.join("db/seeds/spells.rb")'
 
 exec bundle exec puma -C config/puma.rb

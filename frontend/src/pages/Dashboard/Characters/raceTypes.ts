@@ -70,3 +70,10 @@ export const raceIconUrl = (index: string) =>
 
 // Fallback glyph for races without a drawn icon (homebrew, future systems).
 export const raceFallbackGlyph = (index: string) => (index.startsWith('hb-') ? '🧪' : '❓');
+
+// The name a character's race goes by: "Hill Dwarf" rather than
+// "Dwarf (Hill Dwarf)"; "Beasthide Shifter" for subraces that don't name the race.
+export const raceLabel = (raceName: string, subraceName?: string) =>
+  !subraceName ? raceName
+    : subraceName.toLowerCase().includes(raceName.toLowerCase()) ? subraceName
+    : `${subraceName} ${raceName}`;

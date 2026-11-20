@@ -44,27 +44,25 @@ const LanguagesPanel = ({ languages, onChange, isOwner }: Props) => {
         {languages.length === 0 && <span className="text-muted-theme" style={{ fontSize: '0.85rem' }}>None yet.</span>}
       </div>
       {isOwner && (
-        <form
-          className="d-flex gap-2 mt-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            add(adding);
-          }}
-        >
+        // Not a <form>: the sheet around it already is one, and forms can't nest.
+        <div className="d-flex gap-2 mt-2">
           <input
             className="form-control form-control-sm input-theme"
             list="language-options"
             placeholder="Add a language"
             value={adding}
             onChange={(e) => setAdding(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); add(adding); }
+            }}
             maxLength={40}
             aria-label="Add a language"
           />
           <datalist id="language-options">
             {options.map((l) => <option key={l} value={l} />)}
           </datalist>
-          <button type="submit" className="btn btn-sm btn-outline-secondary" disabled={!adding.trim()}>Add</button>
-        </form>
+          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => add(adding)} disabled={!adding.trim()}>Add</button>
+        </div>
       )}
     </div>
   );

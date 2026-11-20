@@ -1,15 +1,14 @@
 import React from 'react';
 import { useCharClasses, findCharClass } from '../useCharClasses';
-import { ABILITY_INDEX_TO_KEY, CharacterClassSummary, classResources, spellSlotsAt } from '../classTypes';
+import { ABILITY_INDEX_TO_KEY, CharacterClassSummary, classResources } from '../classTypes';
 import { CharacterFeat, useFeats } from '../featTypes';
 import ClassIcon, { classIconKey } from './ClassIcon';
+import { TRACKED_COUNTER_KEYS } from '../sheetRules';
 
 interface Props {
   classSummaries: CharacterClassSummary[];
   feats?: CharacterFeat[];
 }
-
-const SLOT_LABELS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 const ClassFeatures = ({ classSummaries, feats = [] }: Props) => {
   const { classes, loading } = useCharClasses();
@@ -20,7 +19,7 @@ const ClassFeatures = ({ classSummaries, feats = [] }: Props) => {
   if (loading) return <p className="text-muted-theme">Loading class data...</p>;
 
   if (withData.length === 0) {
-    return <p className="text-muted-theme">Assign a real class in the sidebar to see proficiencies, spell slots, and class features here.</p>;
+    return <p className="text-muted-theme">Add a class under Details to see its proficiencies and features here.</p>;
   }
 
   return (
@@ -29,7 +28,6 @@ const ClassFeatures = ({ classSummaries, feats = [] }: Props) => {
         const cls = findCharClass(classes, s.char_class_index);
         if (!cls) return null;
         const subclass = cls.subclasses.find((sc) => sc.index === s.subclass_index);
-        const slots = spellSlotsAt(cls, s.level);
         const featuresByLevel = cls.levels
           .filter((l) => l.level <= s.level)
           .map((l) => ({
@@ -54,25 +52,17 @@ const ClassFeatures = ({ classSummaries, feats = [] }: Props) => {
               )}
               {cls.spellcasting_ability && <> · Spellcasting: {(ABILITY_INDEX_TO_KEY[cls.spellcasting_ability] || cls.spellcasting_ability)}</>}
             </p>
-
-            {classResources(cls, s.level).length > 0 && (
-              <div className="d-flex flex-wrap gap-2 mb-2">
-                {classResources(cls, s.level).map((r) => (
-                  <span key={r.label} className="badge-cls">{r.label}: {r.value}</span>
-                ))}
-              </div>
+            {cls.proficiencies.length > 0 && (
+              <p className="text-muted-theme mb-2" style={{ fontSize: '0.8rem' }}>
+                Proficiencies: {cls.proficiencies.filter((p) => !p.startsWith('Saving Throw')).join(', ')}
+              </p>
             )}
 
-            {slots && (
+            {classResources(cls, s.level, TRACKED_COUNTER_KEYS).length > 0 && (
               <div className="d-flex flex-wrap gap-2 mb-2">
-                {typeof slots.cantrips_known === 'number' && slots.cantrips_known > 0 && (
-                  <span className="badge-cls">Cantrips: {slots.cantrips_known}</span>
-                )}
-                {SLOT_LABELS.map((lvl) => {
-                  const val = slots[`spell_slots_level_${lvl}`];
-                  if (!val) return null;
-                  return <span key={lvl} className="badge-cls">Lvl {lvl} slots: {val}</span>;
-                })}
+                {classResources(cls, s.level, TRACKED_COUNTER_KEYS).map((r) => (
+                  <span key={r.label} className="badge-cls">{r.label}: {r.value}</span>
+                ))}
               </div>
             )}
 
