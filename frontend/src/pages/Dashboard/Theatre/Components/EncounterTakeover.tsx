@@ -1,5 +1,4 @@
-import type { InitiativeState, StagedAsset } from './types';
-import CombatTracker from './CombatTracker';
+import type { StagedAsset } from './types';
 
 interface EncounterTakeoverProps {
   asset: StagedAsset;
@@ -8,16 +7,10 @@ interface EncounterTakeoverProps {
   onEnd?: () => void;
   onRollInitiative?: (asset: StagedAsset) => void;
   onViewMonster?: (monsterId: string) => void;
-  /** DM-only: the live initiative tracker, embedded full-height below the
-   * encounter summary instead of tucked away in the sidenav flyout. Players
-   * get the initiative order from the persistent left column instead (see
-   * SessionTheatre), not from inside this card, so it stays put regardless
-   * of whether an encounter is up. */
-  initiative?: InitiativeState;
 }
 
 export default function EncounterTakeover({
-  asset, readOnly = false, onMinimize, onEnd, onRollInitiative, onViewMonster, initiative,
+  asset, readOnly = false, onMinimize, onEnd, onRollInitiative, onViewMonster,
 }: EncounterTakeoverProps) {
   const combatants = asset.combatants ?? [];
 
@@ -85,11 +78,6 @@ export default function EncounterTakeover({
           )}
         </div>
 
-        {!readOnly && initiative && (
-          <div className="theatre__encounter-takeover-initiative">
-            <CombatTracker initiative={initiative} />
-          </div>
-        )}
       </div>
     </div>
   );

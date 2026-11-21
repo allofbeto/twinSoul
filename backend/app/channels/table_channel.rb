@@ -18,8 +18,8 @@ class TableChannel < ApplicationCable::Channel
       stream_from initiative_stream_name(campaign)
 
       transmit({ type: 'reveal', assets: STAGES[campaign.id] || [] })
-      state = INITIATIVE[campaign.id] || { 'combatants' => [], 'turn' => 0 }
-      transmit({ type: 'initiative', combatants: state['combatants'], turn: state['turn'] })
+      state = INITIATIVE[campaign.id] || { 'combatants' => [], 'turn' => 0, 'round' => 1 }
+      transmit({ type: 'initiative', combatants: state['combatants'], turn: state['turn'], round: state['round'] || 1 })
     end
 
     def unsubscribed; end
@@ -49,10 +49,11 @@ class TableChannel < ApplicationCable::Channel
 
       combatants = redacted(data['combatants'] || [])
       turn = data['turn'] || 0
-      INITIATIVE[campaign.id] = { 'combatants' => combatants, 'turn' => turn }
+      round = [data['round'].to_i, 1].max
+      INITIATIVE[campaign.id] = { 'combatants' => combatants, 'turn' => turn, 'round' => round }
       ActionCable.server.broadcast(
         initiative_stream_name(campaign),
-        { type: 'initiative', combatants: combatants, turn: turn }
+        { type: 'initiative', combatants: combatants, turn: turn, round: round }
       )
     rescue ActiveRecord::RecordNotFound
       nil
@@ -80,23 +81,64 @@ class TableChannel < ApplicationCable::Channel
           hp: character.current_hp,
           maxHp: character.max_hp,
           armorClass: character.armor_class,
+          initiative: initiative_from(data['initiative']),
         }
       })
     rescue ActiveRecord::RecordNotFound
       nil
     end
 
+    # A player telling the DM they're finished. Only honoured when it really
+    # is their character's turn (the server knows the order from the DM's last
+    # update), so nobody can nudge the DM on someone else's behalf.
+    def end_turn(_data = nil)
+      campaign = Campaign.find(params[:campaign_id])
+      return unless member?(campaign)
+
+      state = INITIATIVE[campaign.id]
+      return unless state
+
+      current = Array(state['combatants'])[state['turn'].to_i]
+      character_id = current && current['characterId']
+      return if character_id.blank?
+      return unless Character.exists?(id: character_id, user_id: current_user.id, campaign_id: campaign.id)
+
+      TableChannel.broadcast_to(campaign, { type: 'turn_done', characterId: character_id, name: current['name'] })
+    rescue ActiveRecord::RecordNotFound
+      nil
+    end
+
     private
+
+    # A player's own roll, kept to something a d20 plus modifiers could make.
+    def initiative_from(value)
+      n = Integer(value, exception: false)
+      n if n && n.between?(-10, 60)
+    end
 
     def initiative_stream_name(campaign)
       "table_initiative_#{campaign.id}"
     end
 
-    def redacted(combatants)
-      combatants.map do |c|
-        next c unless c['isEnemy'] && !c['revealed']
+    # What players may know about a combatant: where it sits in the order and
+    # whether it's a creature or a player's character. Nothing else is ever
+    # forwarded (no HP, AC, actions or resource state), so the DM's own
+    # tracker can carry whatever it needs without it reaching a player's
+    # connection. Anything the DM added (that isn't a player's character) is
+    # shown as "Unknown Creature" until the DM reveals it.
+    PLAYER_VISIBLE = %w[id name init isEnemy revealed characterId].freeze
+    # A player's character is nothing secret at the table, so its HP is shared too.
+    CHARACTER_VISIBLE = %w[hp maxHp].freeze
 
-        c.merge('name' => 'Unknown Creature', 'monsterId' => nil)
+    def redacted(combatants)
+      Array(combatants).filter_map do |c|
+        next unless c.is_a?(Hash)
+
+        visible = c.slice(*PLAYER_VISIBLE)
+        next visible.merge(c.slice(*CHARACTER_VISIBLE)) if visible['characterId'].present?
+        next visible if visible['revealed']
+
+        visible.merge('name' => 'Unknown Creature')
       end
     end
 

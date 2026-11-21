@@ -17,8 +17,9 @@ import type {
   AssetKind,
   Campaign,
   Combatant,
+  CombatantOption,
   DmPanel,
-  InitiativeState,
+  CombatResources,
   MyCharacter,
   NewItemInput,
   RevealAsset,
@@ -31,6 +32,7 @@ import type {
 import { PANE_DEFAULT, PANE_MAX, PANE_MIN, clamp, coerceTheme } from './Components/types';
 import { rollExpression } from './Components/dice';
 import { useTable } from './Components/useTable';
+import { useCombatantOptions } from './Components/useCombatantOptions';
 import CampaignGate from './Components/CampaignGate';
 import SessionPicker from './Components/SessionPicker';
 import Curtain from './Components/Curtain';
@@ -39,11 +41,12 @@ import Stage from './Components/Stage';
 import Tray from './Components/Tray';
 import TheatreSideNav from './Components/TheatreSideNav';
 import DicePanel from './Components/DicePanel';
-import InitiativePanel from './Components/InitiativePanel';
+import CombatView from './Components/CombatView';
+import type { BlankCombatant } from './Components/CombatView';
+import { resetForTurn } from './Components/combatResources';
 import ScratchPanel from './Components/ScratchPanel';
 import EncounterTakeover from './Components/EncounterTakeover';
-import PlayerInitiativeList from './Components/PlayerInitiativeList';
-import PlayerCharacterJoin from './Components/PlayerCharacterJoin';
+import PlayerCombat from './Components/PlayerCombat';
 import SessionNotebook from '../../../components/sessionNotebook/SessionNotebook';
 import MonsterDetailSlideOver from '../Monsters/Components/MonsterDetailSlideOver';
 import CharacterDetail from '../Characters/CharacterDetail';
@@ -139,13 +142,16 @@ export default function SessionTheatre({
 
   // Items the DM has placed in this campaign — draggable onto the stage.
   const [campaignItems, setCampaignItems] = useState<RevealAsset[]>([]);
+  // The same items, as the server sent them. DM-only: stat blocks must never ride along on a revealed asset.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [rawItems, setRawItems] = useState<any[]>([]);
 
   useEffect(() => {
     if (!selected || selected.role === 'player') return;
     let alive = true;
     getCampaignItems(selected.id)
-      .then((res) => { if (alive) setCampaignItems(res.data.map(normalizeItem)); })
-      .catch(() => { if (alive) setCampaignItems([]); });
+      .then((res) => { if (alive) { setCampaignItems(res.data.map(normalizeItem)); setRawItems(res.data); } })
+      .catch(() => { if (alive) { setCampaignItems([]); setRawItems([]); } });
     return () => { alive = false; };
   }, [selected]);
 
@@ -228,6 +234,7 @@ export default function SessionTheatre({
     const res = await createCampaignItem(selected.id, { ...rest, image_url: imageUrl });
     const created = normalizeItem(res.data);
     setCampaignItems((prev) => [...prev, created]);
+    setRawItems((prev) => [...prev, res.data]);
     return created;
   }, [selected]);
 
@@ -298,8 +305,8 @@ export default function SessionTheatre({
   // Stage is shared over ActionCable: the DM drives it, players receive it live.
   const {
     stage, addToStage, removeFromStage, moveAsset, clearStage,
-    sharedCombatants, sharedTurn, broadcastInitiative,
-    characterAddRequest, requestAddCharacter,
+    sharedCombatants, sharedTurn, sharedRound, broadcastInitiative,
+    characterAddRequest, requestAddCharacter, endTurn, turnDone, clearTurnDone,
   } = useTable({
     campaignId: selected?.id ?? null,
     role: selected?.role,
@@ -334,7 +341,10 @@ export default function SessionTheatre({
 
   const [tab, setTab] = useState<AssetKind>('art');
   const [notesOpen, setNotesOpen] = useState(true);
-  const [initiativeOpen, setInitiativeOpen] = useState(false);
+  // Stage (theatre + notes + tray) is always there; the Combat tab appears once an initiative exists.
+  const [view, setView] = useState<'stage' | 'combat'>('stage');
+  const [combatOn, setCombatOn] = useState(false);
+  const [round, setRound] = useState(1);
   const [trayOpen, setTrayOpen] = useState(true);
   const [panel, setPanel] = useState<DmPanel>(null);
 
@@ -346,16 +356,12 @@ export default function SessionTheatre({
   // Initiative
   const [combatants, setCombatants] = useState<Combatant[]>([]);
   const [turn, setTurn] = useState(0);
-  const [cName, setCName] = useState('');
-  const [cInit, setCInit] = useState('');
-  const [cHp, setCHp] = useState('');
-  const [cAc, setCAc] = useState('');
-  const [cEnemy, setCEnemy] = useState(true);
+  // The last removal, kept for a few seconds so it can be undone.
+  const [removal, setRemoval] = useState<{ label: string; items: { c: Combatant; index: number }[] } | null>(null);
+  const removalTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Scratch
   const [scratch, setScratch] = useState('');
-
-  const dmgRefs = useRef<Record<string, string>>({});
 
   const selectCampaign = useCallback((c: Campaign) => {
     setSelected(c);
@@ -394,6 +400,15 @@ export default function SessionTheatre({
     [allAssets, tab],
   );
 
+  const rawById = useMemo(() => Object.fromEntries(rawItems.map((i) => [String(i.id), i])), [rawItems]);
+
+  // What the DM can search for when adding to initiative.
+  const { options: combatantOptions, loading: combatantOptionsLoading } = useCombatantOptions(
+    selected?.id ?? null,
+    !!selected && selected.role !== 'player',
+    rawItems,
+  );
+
   const kindCounts = useMemo(() => {
     const counts: Record<AssetKind, number> = { art: 0, map: 0, npc: 0, encounter: 0, item: 0 };
     allAssets.forEach((a) => { counts[a.kind] += 1; });
@@ -420,40 +435,133 @@ export default function SessionTheatre({
   // Init is optional: a last-minute addition (a walk-on NPC, a monster that
   // shows up mid-fight) can be dropped in with just a name — its initiative
   // gets auto-rolled — or the DM can type a known value to override that.
-  const addCombatant = useCallback(() => {
-    const name = cName.trim();
+  const addBlank = useCallback((data: BlankCombatant) => {
+    const name = data.name.trim();
     if (!name) return;
-    const typedInit = parseInt(cInit, 10);
-    const init = Number.isNaN(typedInit) ? rollExpression('1d20')?.total ?? 10 : typedInit;
-    const hp = parseInt(cHp, 10);
-    const safeHp = Number.isNaN(hp) ? 0 : hp;
-    const ac = parseInt(cAc, 10);
-    const safeAc = Number.isNaN(ac) ? null : ac;
+    const hp = data.hp != null && data.hp > 0 ? data.hp : 0;
     setCombatants((prev) => [
       ...prev,
-      { id: nextId(), name, init, hp: safeHp, maxHp: safeHp, armorClass: safeAc, isEnemy: cEnemy, revealed: !cEnemy },
+      {
+        id: nextId(), name, init: data.init ?? rollExpression('1d20')?.total ?? 10, hp, maxHp: hp,
+        armorClass: data.ac ?? null, isEnemy: data.isEnemy, revealed: false, // hidden from players until the DM says so
+      },
     ]);
-    setCName(''); setCInit(''); setCHp(''); setCAc('');
-  }, [cName, cInit, cHp, cAc, cEnemy]);
+  }, []);
 
-  const removeCombatant = useCallback((id: string) => {
+  // Adds a searched beast / NPC / character. Initiative is d20 plus the
+  // creature's DEX modifier when we know it; several of the same creature are
+  // numbered ("Goblin 1", "Goblin 2"), carrying on from any already in play.
+  const addFromOption = useCallback((option: CombatantOption, qty: number) => {
     setCombatants((prev) => {
-      const next = prev.filter((c) => c.id !== id);
-      setTurn((t) => (next.length ? Math.min(t, next.length - 1) : 0));
-      return next;
+      if (option.characterId && prev.some((c) => c.characterId === option.characterId)) return prev;
+      const count = option.characterId ? 1 : Math.max(1, Math.min(20, qty));
+      const dexMod = option.dexterity != null ? Math.floor((option.dexterity - 10) / 2) : 0;
+      const already = prev.filter((c) => c.name === option.name || c.name.startsWith(`${option.name} `)).length;
+      const numbered = count > 1 || already > 0;
+      const added: Combatant[] = Array.from({ length: count }, (_, i) => ({
+        id: nextId(),
+        name: numbered ? `${option.name} ${already + i + 1}` : option.name,
+        init: (rollExpression('1d20')?.total ?? 10) + dexMod,
+        hp: option.maxHp,
+        maxHp: option.maxHp,
+        armorClass: option.armorClass,
+        isEnemy: option.isEnemy,
+        revealed: !!option.characterId, // a player's character is always visible; anything else starts hidden
+        monsterId: option.monsterId ?? null,
+        itemId: option.itemId ?? null,
+        characterId: option.characterId ?? null,
+      }));
+      return [...prev, ...added];
     });
   }, []);
+
+  // Refs so handlers always see the latest order and turn.
+  const combatantsRef = useRef(combatants);
+  combatantsRef.current = combatants;
+  const turnRef = useRef(turn);
+  turnRef.current = turn;
+
+  const flashRemoval = useCallback((next: { label: string; items: { c: Combatant; index: number }[] } | null) => {
+    if (removalTimer.current) clearTimeout(removalTimer.current);
+    setRemoval(next);
+    if (next) removalTimer.current = setTimeout(() => setRemoval(null), 8000);
+  }, []);
+
+  // Takes people out of the fight and keeps the turn on whoever was up.
+  const removeMany = useCallback((ids: string[], label: string) => {
+    const prev = combatantsRef.current;
+    const items = prev.map((c, index) => ({ c, index })).filter((x) => ids.includes(x.c.id));
+    if (items.length === 0) return;
+    const next = prev.filter((c) => !ids.includes(c.id));
+    const activeId = prev[turnRef.current]?.id;
+    let nextTurn = next.findIndex((c) => c.id === activeId);
+    if (nextTurn === -1) {
+      const before = prev.slice(0, turnRef.current).filter((c) => !ids.includes(c.id)).length;
+      nextTurn = next.length ? Math.min(before, next.length - 1) : 0;
+    }
+    setCombatants(next);
+    setTurn(nextTurn);
+    flashRemoval({ label, items });
+  }, [flashRemoval]);
+
+  const removeCombatant = useCallback((id: string) => {
+    const name = combatantsRef.current.find((c) => c.id === id)?.name ?? 'Combatant';
+    removeMany([id], `Removed ${name}`);
+  }, [removeMany]);
+
+  const removeDefeated = useCallback(() => {
+    const down = combatantsRef.current.filter((c) => c.maxHp > 0 && c.hp === 0).map((c) => c.id);
+    removeMany(down, `Removed ${down.length} defeated`);
+  }, [removeMany]);
+
+  const undoRemoval = useCallback(() => {
+    if (!removal) return;
+    const current = combatantsRef.current;
+    const activeId = current[turnRef.current]?.id;
+    const next = [...current];
+    [...removal.items].sort((a, b) => a.index - b.index).forEach(({ c, index }) => next.splice(Math.min(index, next.length), 0, c));
+    setCombatants(next);
+    const idx = next.findIndex((c) => c.id === activeId);
+    setTurn(idx === -1 ? 0 : idx);
+    flashRemoval(null);
+  }, [removal, flashRemoval]);
 
   const applyHp = useCallback((id: string, delta: number) => {
     setCombatants((prev) => prev.map((c) =>
       c.id === id ? { ...c, hp: Math.max(0, Math.min(c.maxHp || Infinity, c.hp + delta)) } : c));
   }, []);
 
+  // The next creature's turn: its action economy and legendary actions start fresh,
+  // and the round counts up when the order wraps round.
   const nextTurn = useCallback(() => {
-    setTurn((t) => (combatants.length ? (t + 1) % combatants.length : 0));
-  }, [combatants.length]);
+    const list = combatantsRef.current;
+    if (list.length === 0) return;
+    const nextIdx = (turnRef.current + 1) % list.length;
+    if (nextIdx === 0) setRound((r) => r + 1);
+    setTurn(nextIdx);
+    setCombatants((prev) => prev.map((c, i) => (i === nextIdx ? { ...c, res: resetForTurn(c.res) } : c)));
+  }, []);
 
-  const resetCombat = useCallback(() => { setCombatants([]); setTurn(0); }, []);
+  const endCombat = useCallback(() => {
+    setCombatants([]); setTurn(0); setRound(1); setCombatOn(false); setView('stage'); flashRemoval(null);
+  }, [flashRemoval]);
+
+  // Orders everyone by initiative, keeping the turn on whoever is up.
+  const sortByInit = useCallback(() => {
+    const prev = combatantsRef.current;
+    const activeId = prev[turnRef.current]?.id;
+    const next = [...prev].sort((a, b) => b.init - a.init);
+    setCombatants(next);
+    setTurn(Math.max(0, next.findIndex((c) => c.id === activeId)));
+  }, []);
+
+  const setCombatantRes = useCallback((id: string, res: CombatResources) => {
+    setCombatants((prev) => prev.map((c) => (c.id === id ? { ...c, res } : c)));
+  }, []);
+
+  const toggleCombatView = useCallback(() => {
+    if (!combatOn) { setCombatOn(true); setView('combat'); } else setView((v) => (v === 'combat' ? 'stage' : 'combat'));
+  }, [combatOn]);
 
   // Drops a revealed encounter's monsters into the tracker — one entry per
   // creature (a quantity of 3 becomes "Goblin 1/2/3"), each with a rolled
@@ -479,6 +587,8 @@ export default function SessionTheatre({
     // order they're already in.
     added.sort((a, b) => b.init - a.init);
     setCombatants((prev) => [...prev, ...added]);
+    setCombatOn(true);
+    setView('combat');
   }, []);
 
   // Lets the DM correct a rolled (or manually entered) initiative later —
@@ -501,18 +611,6 @@ export default function SessionTheatre({
     });
   }, []);
 
-  // Fills in AC/HP for a combatant whose encounter snapshot didn't have them
-  // (older encounters, built before AC/HP were captured) — never overwrites
-  // a value that's already set.
-  const handleInheritStats = useCallback((id: string, stats: { armorClass: number | null; maxHp: number }) => {
-    setCombatants((prev) => prev.map((c) => {
-      if (c.id !== id) return c;
-      const armorClass = c.armorClass ?? stats.armorClass;
-      if (c.maxHp > 0 || stats.maxHp <= 0) return { ...c, armorClass };
-      return { ...c, armorClass, maxHp: stats.maxHp, hp: stats.maxHp };
-    }));
-  }, []);
-
   const handleToggleReveal = useCallback((id: string) => {
     setCombatants((prev) => prev.map((c) => (c.id === id ? { ...c, revealed: !c.revealed } : c)));
   }, []);
@@ -522,9 +620,13 @@ export default function SessionTheatre({
   // socket — the server does the actual redaction on every send.
   useEffect(() => {
     if (selected?.role !== 'owner') return;
-    const t = setTimeout(() => broadcastInitiative(combatants, turn), 300);
+    // Only what players may see leaves the DM's browser (the server filters again).
+    const visible = combatants.map(({ id, name, init, isEnemy, revealed, characterId, hp, maxHp }) => (
+      characterId ? { id, name, init, isEnemy, revealed, characterId, hp, maxHp } : { id, name, init, isEnemy, revealed }
+    ));
+    const t = setTimeout(() => broadcastInitiative(visible as Combatant[], turn, round), 300);
     return () => clearTimeout(t);
-  }, [combatants, turn, selected?.role, broadcastInitiative]);
+  }, [combatants, turn, round, selected?.role, broadcastInitiative]);
 
   // A player asked to join their own PC in — insert it (once; ignore repeat
   // requests for a character already tracked) as an always-visible ally.
@@ -535,7 +637,7 @@ export default function SessionTheatre({
       return [...prev, {
         id: nextId(),
         name: characterAddRequest.name,
-        init: rollExpression('1d20')?.total ?? 10,
+        init: characterAddRequest.initiative ?? rollExpression('1d20')?.total ?? 10,
         hp: characterAddRequest.hp,
         maxHp: characterAddRequest.maxHp,
         armorClass: characterAddRequest.armorClass,
@@ -546,34 +648,9 @@ export default function SessionTheatre({
     });
   }, [characterAddRequest, selected?.role]);
 
-  // Bundled so the tracker can be rendered either from the sidenav flyout or
-  // embedded full-height in the encounter takeover without re-threading a
-  // dozen props in two places.
-  const initiativeState: InitiativeState = {
-    combatants,
-    turn,
-    cName,
-    cInit,
-    cHp,
-    cAc,
-    cEnemy,
-    onNameChange: setCName,
-    onInitChange: setCInit,
-    onHpChange: setCHp,
-    onAcChange: setCAc,
-    onToggleEnemy: () => setCEnemy((v) => !v),
-    onAdd: addCombatant,
-    onRemove: removeCombatant,
-    onApplyHp: applyHp,
-    onEditInit: handleEditInit,
-    onReorder: handleReorderCombatants,
-    onInheritStats: handleInheritStats,
-    onToggleReveal: handleToggleReveal,
-    onViewMonster: setViewMonsterId,
-    onNextTurn: nextTurn,
-    onReset: resetCombat,
-    dmgRefs,
-  };
+  useEffect(() => { if (combatants.length > 0) setCombatOn(true); }, [combatants.length]);
+  // A "done" nudge goes stale once the turn moves on.
+  useEffect(() => { clearTurnDone(); }, [turn, clearTurnDone]);
 
   const togglePanel = useCallback((p: DmPanel) => setPanel((cur) => (cur === p ? null : p)), []);
 
@@ -665,15 +742,15 @@ export default function SessionTheatre({
         <div className="theatre__body">
           {/* Always the leftmost column for players — stays put whether or
              not an encounter is currently taking over the rest of the view. */}
-          <aside className="theatre__initiative-col" aria-label="Initiative">
-            {user && (
-              <PlayerCharacterJoin
-                myCharacters={myCharacters}
-                sharedCombatants={sharedCombatants}
-                onRequestAdd={requestAddCharacter}
-              />
-            )}
-            <PlayerInitiativeList combatants={sharedCombatants} turn={sharedTurn} />
+          <aside className="theatre__initiative-col theatre__player-initiative" aria-label="Initiative">
+            <PlayerCombat
+              combatants={sharedCombatants}
+              turn={sharedTurn}
+              round={sharedRound}
+              myCharacters={myCharacters}
+              onJoin={requestAddCharacter}
+              onDone={endTurn}
+            />
           </aside>
 
           <div className="theatre__player-main">
@@ -765,8 +842,8 @@ export default function SessionTheatre({
             onExit={onExit}
             notesOpen={notesOpen}
             onToggleNotes={() => setNotesOpen((v) => !v)}
-            initiativeOpen={initiativeOpen}
-            onToggleInitiative={() => setInitiativeOpen((v) => !v)}
+            initiativeOpen={combatOn && view === 'combat'}
+            onToggleInitiative={toggleCombatView}
             trayOpen={trayOpen}
             onToggleTray={() => setTrayOpen((v) => !v)}
             tab={tab}
@@ -797,6 +874,54 @@ export default function SessionTheatre({
           )}
         </div>
 
+        <div className="theatre__main">
+        {turnDone && (
+          <div className="theatre__nudge" role="status">
+            <span><strong>{turnDone.name}</strong> says they’re done.</span>
+            <button type="button" className="theatre__btn" onClick={() => { nextTurn(); clearTurnDone(); }}>Next turn ›</button>
+            <button type="button" className="theatre__mini" onClick={clearTurnDone} aria-label="Dismiss">✕</button>
+          </div>
+        )}
+        {combatOn && (
+          <nav className="theatre__viewtabs" aria-label="Views">
+            <button type="button" role="tab" aria-selected={view === 'stage'} className={view === 'stage' ? 'is-on' : ''} onClick={() => setView('stage')}>
+              <i className="bx bx-theater" aria-hidden="true" /> Stage
+            </button>
+            <button type="button" role="tab" aria-selected={view === 'combat'} className={view === 'combat' ? 'is-on' : ''} onClick={() => setView('combat')}>
+              <i className="bx bx-shield-quarter" aria-hidden="true" /> Combat <small>{combatants.length}</small>
+            </button>
+            <span className="theatre__viewtabs-now">
+              Round {round} · {combatants[turn]?.name ?? '—'}
+              <button type="button" className="theatre__mini" onClick={nextTurn} disabled={combatants.length === 0}>Next ›</button>
+            </span>
+          </nav>
+        )}
+
+        {combatOn && view === 'combat' ? (
+          <CombatView
+            combatants={combatants}
+            turn={turn}
+            round={round}
+            options={combatantOptions}
+            optionsLoading={combatantOptionsLoading}
+            rawById={rawById}
+            undo={removal ? { label: removal.label, run: undoRemoval } : null}
+            onAddOption={addFromOption}
+            onAddBlank={addBlank}
+            onRemove={removeCombatant}
+            onRemoveDefeated={removeDefeated}
+            onEnd={endCombat}
+            onNextTurn={nextTurn}
+            onSortByInit={sortByInit}
+            onApplyHp={applyHp}
+            onEditInit={handleEditInit}
+            onReorder={handleReorderCombatants}
+            onToggleReveal={handleToggleReveal}
+            onViewMonster={setViewMonsterId}
+            onSetRes={setCombatantRes}
+          />
+        ) : (
+        <div className="theatre__stage-view">
         {encounterAsset && !encounterMinimized ? (
           <EncounterTakeover
             asset={encounterAsset}
@@ -804,7 +929,6 @@ export default function SessionTheatre({
             onEnd={() => { removeFromStage(encounterAsset.instanceId); setEncounterMinimized(false); }}
             onRollInitiative={handleRollInitiative}
             onViewMonster={setViewMonsterId}
-            initiative={initiativeState}
           />
         ) : (
           <>
@@ -816,20 +940,6 @@ export default function SessionTheatre({
               >
                 ⚔ {encounterAsset.title} — restore
               </button>
-            )}
-
-            {initiativeOpen && (
-              <aside className="theatre__initiative-col" aria-label="Initiative tracker">
-                <InitiativePanel {...initiativeState} />
-              </aside>
-            )}
-            {initiativeOpen && (
-              <ResizeHandle
-                label="Resize initiative panel"
-                onPointerDown={startResize('initiative')}
-                onKeyDown={(e) => onHandleKey('initiative', e)}
-                onReset={() => setInitiativeW(PANE_DEFAULT)}
-              />
             )}
 
             {notesOpen && (
@@ -873,6 +983,9 @@ export default function SessionTheatre({
             )}
           </>
         )}
+        </div>
+        )}
+        </div>
       </div>
 
       <MonsterDetailSlideOver monsterId={viewMonsterId} onClose={() => setViewMonsterId(null)} />

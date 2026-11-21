@@ -52,7 +52,7 @@ export default function Tray({ tab, items, stagedIds, onReveal, onCreateItem }: 
                 style={asset.imageUrl ? { backgroundImage: `url(${asset.imageUrl})` } : undefined}
               >
                 {!asset.imageUrl && (
-                  <span className="theatre__card-media-letter">{KIND_LABEL[asset.kind][0]}</span>
+                  <span className="theatre__card-media-letter">{(asset.kind === 'npc' ? asset.title : KIND_LABEL[asset.kind])[0]?.toUpperCase()}</span>
                 )}
                 {isLive && <span className="theatre__live-badge">On stage</span>}
               </div>

@@ -268,6 +268,8 @@
     padding: 10px; overflow-y: auto;
     display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px;
     align-content: start;
+    /* Cards are overflow:hidden, so without this the rows collapse to the image strip and hide the name. */
+    grid-auto-rows: max-content;
   }
   .theatre__tray-empty { grid-column: 1 / -1; color: var(--ink-dim); font-size: 0.82rem; padding: 12px; text-align: center; }
 
@@ -642,25 +644,256 @@
     font-family: inherit;
   }
 
-  .theatre__notes {
-    background: #f5ecd7; /* creamy beige */
-    color: #2b2620;      /* dark ink so text stays readable on the light bg */
-  }
-
-  /* The notes panel is parchment-colored regardless of theatre theme, so its own
-     text/toolbar need dark "ink" colors instead of the theme's light --ink/--accent. */
-  .theatre__notes .theatre__notes-html h2 { color: #6b4a1e; }
-  .theatre__notes .theatre__notes-html p,
-  .theatre__notes .theatre__notes-html li { color: #2b2620; }
-  .theatre__notes .theatre__notes-html strong { color: #7a3b12; }
-  .theatre__notes .theatre__notes-toolbar { border-bottom-color: rgba(43, 38, 32, 0.15); }
-  .theatre__notes .theatre__mini {
-    color: rgba(43, 38, 32, 0.65);
-    border-color: rgba(43, 38, 32, 0.25);
-  }
-  .theatre__notes .theatre__mini:hover { color: #2b2620; border-color: rgba(43, 38, 32, 0.45); }
-  .theatre__notes .theatre__mini.is-on { color: #f5ecd7; background: #6b4a1e; border-color: #6b4a1e; }
-  .theatre__notes .theatre__notes-save,
-  .theatre__notes .theatre__notes-hint { color: rgba(43, 38, 32, 0.55); }
   /* Notes: session notebook */
   .theatre__nb-wrap { height: 100%; overflow-y: auto; padding: 4px 12px 16px; }
+
+  /* ---- Initiative: search and add --------------------------------- */
+  .theatre__init-controls { display: flex; gap: 8px; margin-bottom: 10px; }
+  .theatre__pick { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .theatre__pick-search { display: flex; gap: 8px; align-items: center; }
+  .theatre__pick-search .theatre__input { flex: 1; min-width: 0; }
+  .theatre__pick-qty { display: inline-flex; align-items: center; gap: 4px; font-size: 0.82rem; color: var(--ink-dim); white-space: nowrap; }
+  .theatre__pick-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .theatre__pick-tabs .theatre__chip.is-on { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+  .theatre__pick-tabs small { opacity: 0.7; margin-left: 2px; }
+  .theatre__pick-list {
+    list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px;
+    max-height: 280px; overflow-y: auto;
+  }
+  .theatre__pick-item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .theatre__pick-item.is-character { border-left: 3px solid var(--heal); }
+  .theatre__pick-item.is-beast { border-left: 3px solid var(--enemy); }
+  .theatre__pick-item.is-npc { border-left: 3px solid var(--accent-2); }
+  .theatre__pick-avatar {
+    flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--panel) center / cover no-repeat; border: 1px solid var(--border);
+    color: var(--accent); font-family: var(--font-display); font-size: 0.95rem;
+  }
+  .theatre__pick-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .theatre__pick-text strong { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .theatre__pick-text small { font-size: 0.7rem; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .theatre__pick-stats { display: flex; flex-direction: column; align-items: flex-end; font-size: 0.68rem; color: var(--ink-dim); white-space: nowrap; }
+  .theatre__pick-add { flex: 0 0 auto; min-width: 30px; height: 30px; font-size: 1rem; }
+  .theatre__pick-add:disabled { opacity: 0.5; }
+  .theatre__init-blank-toggle {
+    appearance: none; background: transparent; border: 0; padding: 4px 0; margin-bottom: 8px; text-align: left;
+    color: var(--ink-dim); font: inherit; font-size: 0.8rem; cursor: pointer;
+  }
+  .theatre__init-blank-toggle:hover { color: var(--accent); }
+
+  /* ---- Views: Stage and Combat ------------------------------------- */
+  .theatre__main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+  .theatre__stage-view { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; }
+  .theatre__viewtabs {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 4px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .theatre__viewtabs > button[role="tab"] {
+    appearance: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; min-height: 40px;
+    background: transparent; border: 1px solid transparent; border-radius: calc(var(--radius) - 2px);
+    color: var(--ink-dim); font: inherit; font-family: var(--font-display); font-size: 0.85rem; cursor: pointer;
+  }
+  .theatre__viewtabs > button[role="tab"]:hover { color: var(--ink); }
+  .theatre__viewtabs > button[role="tab"].is-on { color: var(--bg); background: var(--accent); }
+  .theatre__viewtabs small { opacity: 0.75; }
+  .theatre__viewtabs-now { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; padding-right: 6px; font-size: 0.8rem; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ---- Combat ------------------------------------------------------- */
+  .theatre__combat { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; position: relative; }
+  .theatre__combat-bar {
+    flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; padding: 10px 14px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .theatre__combat-stat { display: flex; flex-direction: column; line-height: 1.1; }
+  .theatre__combat-stat small { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); }
+  .theatre__combat-stat strong { font-family: var(--font-display); font-size: 1.5rem; color: var(--accent); }
+  .theatre__combat-now { min-width: 0; flex: 1 1 140px; }
+  .theatre__combat-now strong { font-size: 1.1rem; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .theatre__combat-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+  .theatre__combat-actions .theatre__btn { min-height: 40px; }
+  .theatre__btn.is-danger { color: var(--enemy); border-color: var(--enemy); }
+  .theatre__btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .theatre__combat-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 10px; align-items: start; }
+  .theatre__combat-add {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px;
+    position: sticky; top: 0; max-height: 100%; overflow-y: auto;
+  }
+  .theatre__combat-add-toggle { display: none; }
+  .theatre__combat-order {
+    list-style: none; margin: 0; padding: 0 2px 40px 0; display: flex; flex-direction: column; gap: 8px;
+    min-height: 0; max-height: 100%; overflow-y: auto;
+  }
+  .theatre__combat-slot { list-style: none; }
+
+  .theatre__ccard {
+    display: flex; flex-direction: column; gap: 8px; padding: 10px 12px;
+    background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: var(--radius);
+  }
+  .theatre__ccard.is-enemy { border-left-color: var(--enemy); }
+  .theatre__ccard.is-turn { border-color: var(--accent); border-left-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow); background: var(--panel-2); }
+  .theatre__ccard.is-down { opacity: 0.55; }
+  .theatre__ccard.is-down .theatre__ccard-name strong { text-decoration: line-through; }
+  .theatre__ccard.is-drop-target { border-style: dashed; border-color: var(--accent); }
+  .theatre__ccard-top { display: flex; align-items: center; gap: 8px; }
+  .theatre__ccard-name { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+  .theatre__ccard-name strong { font-size: 0.98rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .theatre__ccard.is-enemy .theatre__ccard-name strong { color: var(--enemy); }
+  .theatre__ccard-name small { font-size: 0.7rem; color: var(--ink-dim); }
+  .theatre__ccard-eye { display: inline-flex; align-items: center; gap: 4px; }
+  .theatre__ccard-eye span { font-size: 0.7rem; }
+  .theatre__ccard-remove { color: var(--ink-dim); min-width: 32px; min-height: 32px; }
+  .theatre__ccard-remove:hover { color: var(--enemy); border-color: var(--enemy); }
+  .theatre__ccard-hp { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .theatre__ccard-hp .theatre__hp-track { flex: 1 1 90px; width: auto; height: 8px; }
+  .theatre__ccard-expand { margin-left: auto; }
+
+  /* Actions and resources manager */
+  .theatre__mgr { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .theatre__econ { display: flex; flex-wrap: wrap; gap: 6px; }
+  .theatre__chip.is-used { opacity: 0.55; text-decoration: line-through; border-style: dashed; }
+  .theatre__mgr-note { margin: 0; font-size: 0.8rem; color: var(--ink-dim); }
+  .theatre__mgr-note.is-error { color: var(--enemy); }
+  .theatre__mgr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .theatre__mgr-label { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); }
+  .theatre__mgr-row small { font-size: 0.7rem; color: var(--ink-dim); }
+  .theatre__slot { display: inline-flex; align-items: center; gap: 6px; }
+  .theatre__slot em { font-style: normal; font-size: 0.7rem; color: var(--ink-dim); min-width: 28px; }
+  .theatre__pips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+  .theatre__pip { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 2px solid var(--accent); background: transparent; cursor: pointer; }
+  .theatre__pip.is-full { background: var(--accent); }
+  .theatre__mgr-group h4 { margin: 0 0 4px; font-family: var(--font-display); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+  .theatre__mgr-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .theatre__act { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 8px; }
+  .theatre__act.is-spent { opacity: 0.6; }
+  .theatre__act-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .theatre__act-main {
+    appearance: none; flex: 1 1 160px; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+    padding: 2px 0; background: transparent; border: 0; color: var(--ink); text-align: left; font: inherit; cursor: pointer;
+  }
+  .theatre__act-main strong { font-size: 0.86rem; }
+  .theatre__act-main small { font-size: 0.72rem; color: var(--ink-dim); }
+  .theatre__act-tools { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .theatre__act-desc { margin: 6px 0 2px; font-size: 0.82rem; line-height: 1.5; color: var(--ink-dim); white-space: pre-line; }
+  .theatre__mini.is-ready { color: var(--heal); border-color: var(--heal); }
+  .theatre__mini.is-spent { color: var(--enemy); border-color: var(--enemy); }
+
+  /* Undo toast */
+  .theatre__toast {
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 20;
+    display: flex; align-items: center; gap: 14px; padding: 10px 14px; max-width: calc(100% - 24px);
+    background: var(--panel-2); color: var(--ink); border: 1px solid var(--accent); border-radius: 999px; box-shadow: var(--shadow); font-size: 0.85rem;
+  }
+  .theatre__toast button { appearance: none; background: transparent; border: 0; color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; padding: 2px 6px; }
+
+  @media (pointer: coarse) {
+    .theatre__ccard .theatre__mini { min-height: 38px; min-width: 38px; }
+    .theatre__ccard .theatre__input--tiny { min-height: 38px; width: 56px; font-size: 16px; }
+    .theatre__pip { width: 26px; height: 26px; }
+    .theatre__init-badge-input { font-size: 16px; }
+  }
+
+  /* Phones and narrow windows: the add panel folds away and the order takes the width. */
+  @media (max-width: 900px) {
+    .theatre__combat-body { grid-template-columns: 1fr; }
+    .theatre__combat-add { position: static; padding: 0; overflow: visible; }
+    .theatre__combat-add-toggle {
+      display: flex; width: 100%; justify-content: space-between; padding: 12px; min-height: 48px;
+      background: transparent; border: 0; color: var(--ink); font: inherit; font-family: var(--font-display); cursor: pointer;
+    }
+    .theatre__combat-add-body { display: none; padding: 0 12px 12px; }
+    .theatre__combat-add.is-open .theatre__combat-add-body { display: block; }
+    .theatre__combat-order { max-height: none; overflow: visible; }
+    .theatre__main { overflow-y: auto; }
+    .theatre__combat { min-height: auto; }
+    .theatre__combat-actions { width: 100%; margin-left: 0; }
+    .theatre__combat-actions .theatre__btn { flex: 1 1 auto; }
+    .theatre__viewtabs-now { display: none; }
+  }
+
+  /* ---- Players: initiative ------------------------------------------ */
+  .theatre__player-initiative { overflow-y: auto; }
+  .theatre__pcombat { display: flex; flex-direction: column; gap: 10px; }
+  .theatre__pcombat-head { display: flex; align-items: baseline; justify-content: space-between; }
+  .theatre__pcombat-head h3 { margin: 0; font-family: var(--font-display); font-size: 1rem; color: var(--accent); }
+  .theatre__pcombat-round { font-size: 0.78rem; color: var(--ink-dim); letter-spacing: 0.06em; text-transform: uppercase; }
+  .theatre__yourturn {
+    display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--radius);
+    background: var(--accent); color: var(--bg); box-shadow: 0 0 0 2px var(--accent), var(--shadow); animation: pulse-turn 1.4s ease-in-out infinite;
+  }
+  .theatre__yourturn strong { font-family: var(--font-display); font-size: 1.05rem; }
+  .theatre__yourturn .theatre__btn { background: var(--bg); color: var(--accent); border-color: var(--bg); }
+  .theatre__nowup { display: flex; flex-direction: column; padding: 8px 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); }
+  .theatre__nowup small { font-size: 0.64rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); }
+  .theatre__nowup strong { font-size: 1rem; }
+  .theatre__nowup.is-next { border-color: var(--accent); }
+  .theatre__nowup.is-next small { color: var(--accent); }
+  .theatre__pjoin { display: flex; flex-direction: column; gap: 6px; padding: 10px; background: var(--panel-2); border: 1px dashed var(--border); border-radius: var(--radius); }
+  .theatre__pjoin small { font-size: 0.74rem; color: var(--ink-dim); }
+  .theatre__pjoin-row { display: flex; align-items: center; gap: 6px; }
+  .theatre__pjoin-name { flex: 1; min-width: 0; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .theatre__pcombat-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .theatre__pcombat-item {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    background: var(--panel-2); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: var(--radius);
+  }
+  .theatre__pcombat-item.is-enemy { border-left-color: var(--enemy); }
+  .theatre__pcombat-item.is-you { border-left-color: var(--heal); }
+  .theatre__pcombat-item.is-unknown .theatre__pcombat-name strong { color: var(--ink-dim); font-style: italic; }
+  .theatre__pcombat-item.is-turn { border-color: var(--accent); border-left-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .theatre__pcombat-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
+  .theatre__pcombat-name strong { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .theatre__pcombat-name em { font-style: normal; font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px; color: var(--bg); background: var(--heal); }
+
+  /* DM: a player says their turn is over */
+  .theatre__nudge {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-size: 0.88rem;
+    background: var(--panel-2); border: 1px solid var(--accent); border-radius: var(--radius);
+  }
+  .theatre__nudge span { flex: 1; }
+
+  @media (max-width: 900px) {
+    .theatre__player-initiative { width: auto; max-height: 55vh; }
+  }
+
+  /* ---- Reactions and legendary actions: impossible to miss ---------- */
+  .theatre__flags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .theatre__flag {
+    appearance: none; display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 4px 12px;
+    border-radius: 999px; border: 2px solid; font: inherit; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.05em;
+    text-transform: uppercase; cursor: pointer; max-width: 100%; text-align: left;
+  }
+  .theatre__flag--reaction { color: var(--bg); background: var(--accent-2); border-color: var(--accent-2); }
+  .theatre__flag--legendary { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+  .theatre__flag.is-used { color: var(--ink-dim); background: transparent; text-decoration: line-through; opacity: 0.7; }
+  .theatre__flag.is-live { animation: theatre-live 1.3s ease-in-out infinite; box-shadow: 0 0 0 0 var(--accent); }
+  @keyframes theatre-live { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent); } }
+  @media (prefers-reduced-motion: reduce) { .theatre__flag.is-live { animation: none; } }
+
+  .theatre__alert { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--radius); border: 2px solid; }
+  .theatre__alert header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+  .theatre__alert header strong { font-family: var(--font-display); font-size: 1.05rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .theatre__alert header span { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .theatre__alert ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .theatre__alert li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .theatre__alert li > b, .theatre__alert-text b { font-size: 0.95rem; }
+  .theatre__alert small { display: block; font-size: 0.78rem; color: var(--ink-dim); }
+  .theatre__alert p { margin: 2px 0 0; font-size: 0.82rem; line-height: 1.45; color: var(--ink); white-space: pre-line; }
+  .theatre__alert-text { flex: 1 1 200px; min-width: 0; }
+  .theatre__alert-btn {
+    appearance: none; min-height: 44px; padding: 8px 18px; border-radius: var(--radius); font: inherit; font-weight: 800;
+    letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer; border: 2px solid; color: var(--bg);
+  }
+  .theatre__alert-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .theatre__alert--reaction { border-color: var(--accent-2); background: color-mix(in srgb, var(--accent-2) 14%, var(--panel)); }
+  .theatre__alert--reaction header strong, .theatre__alert--reaction header span { color: var(--accent-2); }
+  .theatre__alert--reaction .theatre__alert-btn { background: var(--accent-2); border-color: var(--accent-2); }
+  .theatre__alert--legendary { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
+  .theatre__alert--legendary header strong, .theatre__alert--legendary header span { color: var(--accent); }
+  .theatre__alert--legendary .theatre__alert-btn { background: var(--accent); border-color: var(--accent); }
+  .theatre__alert--legendary .theatre__pip { width: 24px; height: 24px; }
+  .theatre__alert.is-used { opacity: 0.75; border-style: dashed; }
+  .theatre__alert.is-used .theatre__alert-btn { background: transparent; color: var(--ink); border-color: var(--border); }

@@ -35,7 +35,8 @@ interface UseTable {
    * DM drives their own tracker locally and doesn't consume this. */
   sharedCombatants: Combatant[];
   sharedTurn: number;
-  broadcastInitiative: (combatants: Combatant[], turn: number) => void;
+  sharedRound: number;
+  broadcastInitiative: (combatants: Combatant[], turn: number, round: number) => void;
   /** The latest "add my character" request from any player — the DM's
    * screen watches this and inserts it into the local tracker; everyone
    * else just ignores it (they have no local tracker to insert into). */
@@ -43,7 +44,12 @@ interface UseTable {
   /** Any campaign member can call this for their own character — the
    * server looks it up by id (scoped to this user + campaign) rather than
    * trusting whatever stats are passed in. */
-  requestAddCharacter: (characterId: string) => void;
+  requestAddCharacter: (characterId: string, initiative?: number) => void;
+  /** Players: "I'm done". The server only passes it on when it really is their turn. */
+  endTurn: () => void;
+  /** The DM's screen: a player says their turn is over. */
+  turnDone: { characterId: string; name: string } | null;
+  clearTurnDone: () => void;
 }
 
 export function useTable({ campaignId, role, token }: UseTableArgs): UseTable {
@@ -52,6 +58,8 @@ export function useTable({ campaignId, role, token }: UseTableArgs): UseTable {
   stageRef.current = stage;
   const [sharedCombatants, setSharedCombatants] = useState<Combatant[]>([]);
   const [sharedTurn, setSharedTurn] = useState(0);
+  const [sharedRound, setSharedRound] = useState(1);
+  const [turnDone, setTurnDone] = useState<{ characterId: string; name: string } | null>(null);
   const [characterAddRequest, setCharacterAddRequest] = useState<CharacterAddPayload | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subRef = useRef<any>(null);
@@ -72,12 +80,18 @@ export function useTable({ campaignId, role, token }: UseTableArgs): UseTable {
           assets?: StagedAsset[];
           combatants?: Combatant[];
           turn?: number;
+          round?: number;
           character?: CharacterAddPayload;
+          characterId?: string;
+          name?: string;
         }) {
           if (data.type === 'reveal') setStage(data.assets ?? []);
           else if (data.type === 'initiative') {
             setSharedCombatants(data.combatants ?? []);
             setSharedTurn(data.turn ?? 0);
+            setSharedRound(data.round ?? 1);
+          } else if (data.type === 'turn_done' && data.characterId) {
+            setTurnDone({ characterId: data.characterId, name: data.name ?? 'A player' });
           } else if (data.type === 'add_character' && data.character) {
             setCharacterAddRequest(data.character);
           }
@@ -119,19 +133,22 @@ export function useTable({ campaignId, role, token }: UseTableArgs): UseTable {
   // The DM's tracker is authoritative on their own screen — this just tells
   // the server what to (redact and) forward to players. No local/optimistic
   // update here since the DM never reads sharedCombatants back.
-  const broadcastInitiative = useCallback((combatants: Combatant[], turn: number) => {
+  const broadcastInitiative = useCallback((combatants: Combatant[], turn: number, round: number) => {
     if (role !== 'owner') return;
-    subRef.current?.perform('set_initiative', { combatants, turn });
+    subRef.current?.perform('set_initiative', { combatants, turn, round });
   }, [role]);
 
   // Any member (not owner-gated) — a player joining their own PC into the fight.
-  const requestAddCharacter = useCallback((characterId: string) => {
-    subRef.current?.perform('add_character', { character_id: characterId });
+  const requestAddCharacter = useCallback((characterId: string, initiative?: number) => {
+    subRef.current?.perform('add_character', { character_id: characterId, initiative });
   }, []);
+
+  const endTurn = useCallback(() => { subRef.current?.perform('end_turn', {}); }, []);
+  const clearTurnDone = useCallback(() => setTurnDone(null), []);
 
   return {
     stage, addToStage, removeFromStage, moveAsset, clearStage,
-    sharedCombatants, sharedTurn, broadcastInitiative,
-    characterAddRequest, requestAddCharacter,
+    sharedCombatants, sharedTurn, sharedRound, broadcastInitiative,
+    characterAddRequest, requestAddCharacter, endTurn, turnDone, clearTurnDone,
   };
 }

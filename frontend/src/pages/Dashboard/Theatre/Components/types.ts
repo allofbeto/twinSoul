@@ -1,4 +1,4 @@
-import type { MutableRefObject, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 export type TheatreTheme = 'default' | 'dos' | 'magic';
 
@@ -68,6 +68,39 @@ export interface NewItemInput {
   imageUrl?: string;
 }
 
+/** Something the DM can search for and drop into the initiative tracker. */
+export type CombatantSource = 'beast' | 'npc' | 'character';
+
+export interface CombatantOption {
+  key: string;
+  source: CombatantSource;
+  name: string;
+  subtitle: string;
+  armorClass: number | null;
+  /** Current HP for a character, full HP for the rest. */
+  maxHp: number;
+  dexterity: number | null;
+  imageUrl?: string;
+  /** Starts as an enemy (hidden from players until revealed). */
+  isEnemy: boolean;
+  monsterId?: string | null;
+  /** NPC or homebrew monster item in this campaign (its stat block is looked up from the DM's own items). */
+  itemId?: string | null;
+  characterId?: string | null;
+}
+
+/** A DM-controlled creature's spent actions and resources. Lives only in the DM's tracker. */
+export interface CombatResources {
+  /** Action economy used this turn; cleared when the creature's turn comes round. */
+  econ?: { action?: boolean; bonus?: boolean; reaction?: boolean; move?: boolean };
+  /** Uses spent per ability key (limited uses, or 1 when a recharge ability is spent). */
+  used?: Record<string, number>;
+  /** Spell slots spent, by level. */
+  slotsUsed?: Record<string, number>;
+  /** Legendary actions spent this round; cleared at the start of the creature's turn. */
+  legendaryUsed?: number;
+}
+
 export interface Combatant {
   id: string;
   name: string;
@@ -79,6 +112,10 @@ export interface Combatant {
   /** Bestiary monster id, when added from an encounter — lets the DM view
    * its stat block from the initiative list. */
   monsterId?: string | null;
+  /** NPC / homebrew monster item, for looking up its actions. */
+  itemId?: string | null;
+  /** Spent actions and resources (DM-controlled creatures). */
+  res?: CombatResources;
   /** Whether players are allowed to see this combatant's real name. Only
    * meaningful for enemies — allies are always shown as themselves. The
    * server enforces this: an unrevealed enemy's name never reaches a
@@ -97,6 +134,8 @@ export interface CharacterAddPayload {
   hp: number;
   maxHp: number;
   armorClass: number | null;
+  /** The player's own roll, when they gave one. */
+  initiative?: number | null;
 }
 
 /** One of the current player's own characters in this campaign. */
@@ -171,37 +210,6 @@ export interface TheatreEncounter {
 /** Everything the initiative tracker needs — bundled so it can be rendered
  * from either the sidenav flyout or embedded full-height in the encounter
  * takeover without threading a dozen individual props through both. */
-export interface InitiativeState {
-  combatants: Combatant[];
-  turn: number;
-  cName: string;
-  cInit: string;
-  cHp: string;
-  cAc: string;
-  cEnemy: boolean;
-  onNameChange: (value: string) => void;
-  onInitChange: (value: string) => void;
-  onHpChange: (value: string) => void;
-  onAcChange: (value: string) => void;
-  onToggleEnemy: () => void;
-  onAdd: () => void;
-  onRemove: (id: string) => void;
-  onApplyHp: (id: string, delta: number) => void;
-  onEditInit: (id: string, init: number) => void;
-  onReorder: (draggedId: string, targetId: string) => void;
-  /** Backfills a combatant's AC/HP from its bestiary monster record when the
-   * encounter snapshot didn't have them (e.g. an encounter built before AC/HP
-   * snapshotting existed). Only fills gaps — never overwrites a value the DM
-   * already set. */
-  onInheritStats: (id: string, stats: { armorClass: number | null; maxHp: number }) => void;
-  /** Flips whether players can see this combatant's real name. */
-  onToggleReveal: (id: string) => void;
-  onViewMonster?: (monsterId: string) => void;
-  onNextTurn: () => void;
-  onReset: () => void;
-  dmgRefs: MutableRefObject<Record<string, string>>;
-}
-
 export const KIND_LABEL: Record<AssetKind, string> = {
   art: 'Art', map: 'Maps', npc: 'NPCs', encounter: 'Encounters', item: 'Items',
 };
