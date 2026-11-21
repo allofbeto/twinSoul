@@ -13,7 +13,8 @@
 .npcb-status.is-bad { color: var(--color-error, #ef4444); }
 
 .npcb-body { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 1rem; align-items: start; }
-@media (max-width: 900px) { .npcb-body { grid-template-columns: 1fr; } .npcb-card { position: static !important; } }
+@media (max-width: 900px) { .npcb-body { grid-template-columns: 240px minmax(0, 1fr); } }
+@media (max-width: 760px) { .npcb-body { grid-template-columns: 1fr; } .npcb-card { position: static !important; } }
 
 .npcb-card { position: sticky; top: 1rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--border-radius); padding: 1rem; text-align: center; }
 .npcb-portrait { width: 150px; height: 150px; margin: 0 auto 0.75rem; border-radius: 50%; overflow: hidden; border: 2px solid var(--color-primary); background: var(--color-surface-raised, var(--color-background)); display: flex; align-items: center; justify-content: center; }
@@ -158,3 +159,84 @@ select.sbe-in { padding-right: 1.6rem; text-overflow: ellipsis; }
 .npcb-portrait-input:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
 .npcb-portrait-actions { display: flex; gap: 0.4rem; justify-content: center; }
 .npcb-portrait-error { font-size: 0.74rem; color: var(--color-error, #ef4444); margin: -0.4rem 0 0.6rem; }
+
+/* Guided start */
+.npcs-start { max-width: 40rem; margin: 0 auto; display: flex; flex-direction: column; gap: 0.75rem; }
+.npcs-start-head { display: flex; align-items: center; gap: 0.75rem; }
+.npcs-start-head h2 { margin: 0; font-size: 1.4rem; }
+.npcs-start-label { display: block; margin-bottom: 0.25rem; font-size: 0.8rem; color: var(--color-text-muted); }
+.npcs-start-label em { font-style: normal; opacity: 0.7; }
+.npcs-start-examples { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.npcs-start-examples button {
+  padding: 0.35rem 0.7rem; border: 1px solid var(--color-border); border-radius: 999px;
+  background: transparent; color: var(--color-text-muted); font-size: 0.78rem; text-align: left;
+}
+.npcs-start-examples button:hover:not(:disabled) { color: var(--color-text); border-color: var(--color-primary); }
+.npcs-start-grid label { display: block; }
+.npcs-start-roles { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.5rem; }
+.npcs-start-roles button {
+  display: flex; flex-direction: column; gap: 0.15rem; padding: 0.55rem 0.7rem; text-align: left;
+  border: 1px solid var(--color-border); border-radius: var(--border-radius);
+  background: var(--color-surface); color: var(--color-text);
+}
+.npcs-start-roles button span { font-size: 0.72rem; color: var(--color-text-muted); }
+.npcs-start-roles button.is-on { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface)); }
+.npcs-start-error { margin: 0; color: var(--color-error, #dc3545); font-size: 0.9rem; }
+.npcs-start-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.npcs-start-actions .btn { flex: 1 1 12rem; min-height: 2.9rem; }
+.npcs-start-note { margin: 0; font-size: 0.78rem; color: var(--color-text-muted); }
+
+/* AI-draft banner and CR guidance */
+.npcb-banner {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem;
+  margin-bottom: 0.75rem; padding: 0.6rem 0.85rem; font-size: 0.88rem;
+  border: 1px solid var(--color-primary); border-radius: var(--border-radius);
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+}
+.npcb-guide { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.8rem; color: var(--color-text-muted); }
+
+/* Live stat block */
+.npcb-preview-toggle {
+  width: 100%; margin-top: 0.75rem; padding: 0.45rem; border: 1px solid var(--color-border);
+  border-radius: var(--border-radius); background: var(--color-surface-raised); color: var(--color-text); font-size: 0.82rem;
+}
+.npcb-preview-wrap { text-align: left; margin-top: 0.6rem; }
+.npcb-preview section { margin-bottom: 0.6rem; }
+.npcb-preview h5 {
+  margin: 0 0 0.3rem; padding-bottom: 0.15rem; border-bottom: 1px solid var(--color-border);
+  font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-primary);
+}
+.npcb-preview p { margin: 0 0 0.4rem; font-size: 0.8rem; line-height: 1.45; color: var(--color-text); }
+.npcb-preview-roll { color: var(--color-text-muted); }
+.npcb-preview-empty { margin: 0; font-size: 0.78rem; color: var(--color-text-muted); text-align: center; }
+@media (min-width: 901px) { .npcb-preview-toggle { display: none; } }
+@media (max-width: 900px) { .npcb-preview-wrap:not(.is-open) { display: none; } }
+
+/* ===== Phone layout (NPC builder narrower than 760px) ===== */
+.npcb--mobile { padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px)); }
+.npcb--mobile .npcb-header { padding: 0.6rem 0.7rem; gap: 0.5rem; margin-bottom: 0.6rem; }
+.npcb--mobile .npcb-name { flex: 1 1 100%; font-size: 1.3rem; order: 2; }
+.npcb--mobile .npcb-dispo { order: 3; }
+.npcb--mobile .npcb-header > .btn { order: 1; }
+.npcb--mobile .npcb-header-end { order: 1; margin-left: auto; }
+.npcb--mobile .npcb-header-end .btn-theme-primary { display: none; } /* Create lives in the dock */
+.npcb--mobile .npcb-header-end .npcb-status { display: none; } /* so does the save status */
+.npcb--mobile .npcb-panel { padding: 0.25rem 0 1rem; }
+.npcb--mobile .npcb-portrait { width: 110px; height: 110px; }
+.npcb--mobile .sheet-tabs--mobile { margin-top: 0.25rem; }
+.npcb--mobile .sbe-section > :not(summary) { margin-left: 0.7rem; margin-right: 0.7rem; }
+
+/* Floating Create / save pill above the bottom nav */
+.npcb-dock {
+  position: fixed; left: 50%; bottom: calc(4.4rem + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 45;
+  display: flex; align-items: center; gap: 0.5rem; max-width: calc(100vw - 1.5rem);
+  padding: 0.3rem; border: 1px solid var(--color-border); border-radius: 999px;
+  background: var(--color-surface-raised); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.npcb-dock .npcb-status { padding: 0 0.7rem; white-space: nowrap; }
+.npcb-dock-create {
+  min-height: 2.7rem; padding: 0 1.4rem; border: 0; border-radius: 999px;
+  background: var(--color-primary); color: #fff; font-weight: 700;
+}
+.npcb-dock-create:disabled { opacity: 0.6; }
+.npcb-card--flat { position: static; border: 0; padding: 0; background: transparent; }

@@ -5,6 +5,12 @@ import RichTextEditor from '../../../../components/formComponents/RichTextEditor
 import { ABILITY_SCORES, DND_SKILLS } from '../../Characters/constants';
 import NpcSkills from './NpcSkills';
 import NpcStatblockEditor from './NpcStatblockEditor';
+import NpcStatblockPreview from './NpcStatblockPreview';
+import { CR_OPTIONS, guideFor, midHp } from '../crDefaults';
+import MobileVitalsBar from '../../Characters/Components/sheet/MobileVitalsBar';
+import TabbedPanel from '../../Characters/Components/TabbedPanel';
+import { useNarrow, useSheetSwipeDismiss } from '../../Characters/useNarrow';
+import '../../../../styles/characterSheet.css'; // bottom nav and bottom-sheet dialogs shared with the character sheet
 import {
   cleanStatblock, emptyStatblock, modOfScore, proficiencyForCr, statblockFrom, type StatblockFields,
 } from '../statblock';
@@ -87,6 +93,8 @@ const signed = (n: number) => (n >= 0 ? `+${n}` : `−${Math.abs(n)}`);
 
 export default function NpcBuilder({ mode, initial, isOwner, onSave, onCreate, onDelete }: Props) {
   const navigate = useNavigate();
+  const [rootRef, narrow] = useNarrow(760);
+  useSheetSwipeDismiss(narrow);
   const [npc, setNpc] = useState<NpcData>(initial);
   const [tab, setTab] = useState<Tab>('overview');
   const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([]);
@@ -96,6 +104,7 @@ export default function NpcBuilder({ mode, initial, isOwner, onSave, onCreate, o
   const [creating, setCreating] = useState(false);
   const [badImage, setBadImage] = useState(''); // the URL that failed to load, if any
   const [editingPortrait, setEditingPortrait] = useState(false);
+  const [showPreview, setShowPreview] = useState(false); // phones: the stat block starts folded
   const dirty = useRef(false);
   const first = useRef(true);
 
@@ -129,6 +138,7 @@ export default function NpcBuilder({ mode, initial, isOwner, onSave, onCreate, o
   const pb = proficiencyForCr(npc.challenge_rating);
   const perceptionBonus = mods.wisdom + (npc.skills.map((s) => s.toLowerCase()).includes('perception') ? pb : 0);
   const off = !isOwner;
+  const guide = guideFor(npc.challenge_rating);
 
   const create = async () => {
     if (!npc.name.trim()) { setError('Give your NPC a name first.'); setTab('overview'); return; }
@@ -145,16 +155,193 @@ export default function NpcBuilder({ mode, initial, isOwner, onSave, onCreate, o
     combat: npc.actions.length + npc.bonus_actions.length + npc.reactions.length + npc.legendary_actions.length + npc.traits.length,
     magic: npc.spells.length + npc.equipment.length,
   };
-  const tabs: { key: Tab; label: string; count?: number }[] = [
-    { key: 'overview', label: 'Overview' },
-    { key: 'abilities', label: 'Abilities' },
-    { key: 'actions', label: 'Actions', count: counts.combat },
-    { key: 'magic', label: 'Magic & Gear', count: counts.magic },
-    { key: 'notes', label: 'Notes' },
+  const tabs: { key: Tab; label: string; short: string; count?: number }[] = [
+    { key: 'overview', label: 'Overview', short: 'Overview' },
+    { key: 'abilities', label: 'Abilities', short: 'Abilities' },
+    { key: 'actions', label: 'Actions', short: 'Actions', count: counts.combat },
+    { key: 'magic', label: 'Magic & Gear', short: 'Magic', count: counts.magic },
+    { key: 'notes', label: 'Notes', short: 'Notes' },
   ];
 
+  // The summary (portrait, vitals, facts, stat block): a sidebar on wide screens, a sheet on phones.
+  const summary = (inSheet: boolean) => (
+    <>
+        <button
+          type="button" className="npcb-portrait" disabled={off}
+          title={off ? undefined : 'Set portrait image'} aria-label={off ? 'Portrait' : 'Set portrait image'}
+          onClick={() => setEditingPortrait((v) => !v)}
+        >
+          {npc.image_url && badImage !== npc.image_url
+            ? <img src={npc.image_url} alt="" onError={() => setBadImage(npc.image_url)} />
+            : <span>{npc.name.trim() ? npc.name.trim()[0].toUpperCase() : '?'}</span>}
+          {!off && <em className="npcb-portrait-hint">{npc.image_url ? 'Change' : '＋ Add image'}</em>}
+        </button>
+        {editingPortrait && !off && (
+          <div className="npcb-portrait-edit">
+            <input
+              className="npcb-portrait-input" autoFocus placeholder="Paste an image URL" aria-label="Portrait image URL"
+              value={npc.image_url} onChange={(e) => set({ image_url: e.target.value.trim() })}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); setEditingPortrait(false); } }}
+            />
+            <div className="npcb-portrait-actions">
+              <button type="button" className="btn btn-sm btn-theme-primary" onClick={() => setEditingPortrait(false)}>Done</button>
+              {npc.image_url && <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => { set({ image_url: '' }); setEditingPortrait(false); }}>Remove</button>}
+            </div>
+          </div>
+        )}
+        {npc.image_url && badImage === npc.image_url && <div className="npcb-portrait-error">Couldn’t load that image — check the link.</div>}
+        <h3 className="npcb-card-name">{npc.name || 'Unnamed NPC'}</h3>
+        <div className="npcb-card-sub">
+          <span className={`npc-disposition-badge npc-disposition-${npc.disposition}`}>{npc.disposition}</span>
+          {npc.challenge_rating && <span>CR {npc.challenge_rating}</span>}
+        </div>
+        <div className="npcb-vitals">
+          <div><em>AC</em><strong>{npc.armor_class}</strong></div>
+          <div><em>HP</em><strong>{npc.max_hp}</strong></div>
+          <div><em>PROF</em><strong>{signed(pb)}</strong></div>
+        </div>
+        <div className="npcb-mods">
+          {ABILITY_SCORES.map((a) => (
+            <div key={a.key}><em>{a.label}</em><strong>{signed(mods[a.key])}</strong></div>
+          ))}
+        </div>
+        <dl className="npcb-facts">
+          <div><dt>Initiative</dt><dd>{signed(mods.dexterity)}</dd></div>
+          <div><dt>Passive Perception</dt><dd>{10 + perceptionBonus}</dd></div>
+          {npc.speed && <div><dt>Speed</dt><dd>{npc.speed}</dd></div>}
+          {npc.senses && <div><dt>Senses</dt><dd>{npc.senses}</dd></div>}
+          {npc.languages && <div><dt>Languages</dt><dd>{npc.languages}</dd></div>}
+          {npc.defenses && <div><dt>Defenses</dt><dd>{npc.defenses}</dd></div>}
+        </dl>
+        <button type="button" className="npcb-preview-toggle" aria-expanded={showPreview} onClick={() => setShowPreview((v) => !v)}>
+          Stat block {showPreview ? '▴' : '▾'}
+        </button>
+        <div className={`npcb-preview-wrap ${showPreview || inSheet ? 'is-open' : ''}`}>
+          <NpcStatblockPreview npc={npc as any} pb={pb} />
+        </div>
+    </>
+  );
+
+  const panel_overview = (
+        <div className="npcb-panel">
+          <div className="row g-3">
+            <div className="col-md-6">
+              <label className="form-label text-muted-theme">Campaign</label>
+              <select className="form-select input-theme" value={npc.campaign_id} disabled={off} onChange={(e) => set({ campaign_id: e.target.value })}>
+                {mode === 'edit' && <option value="">No campaign</option>}
+                {campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="col-md-6">
+              <label className="form-label text-muted-theme">Tags</label>
+              <input className="form-control input-theme" placeholder="Tavern keeper, Recurring" value={npc.categories} disabled={off} onChange={(e) => set({ categories: e.target.value })} />
+            </div>
+            <div className="col-6 col-md-3">
+              <label className="form-label text-muted-theme">Challenge rating</label>
+              <select className="form-select input-theme" value={npc.challenge_rating} disabled={off} onChange={(e) => set({ challenge_rating: e.target.value })}>
+                {!npc.challenge_rating && <option value="">Not set</option>}
+                {npc.challenge_rating && !CR_OPTIONS.includes(npc.challenge_rating) && <option value={npc.challenge_rating}>CR {npc.challenge_rating}</option>}
+                {CR_OPTIONS.map((c) => <option key={c} value={c}>CR {c}</option>)}
+              </select>
+            </div>
+            <div className="col-6 col-md-3">
+              <label className="form-label text-muted-theme">Armor class</label>
+              <input className="form-control input-theme" type="number" min={0} value={npc.armor_class} disabled={off} onChange={setNum('armor_class')} />
+            </div>
+            <div className="col-6 col-md-3">
+              <label className="form-label text-muted-theme">Max HP</label>
+              <input className="form-control input-theme" type="number" min={1} value={npc.max_hp} disabled={off}
+                onChange={(e) => { const m = Math.max(1, parseInt(e.target.value, 10) || 1); set({ max_hp: m, current_hp: mode === 'new' ? m : Math.min(npc.current_hp, m) }); }} />
+            </div>
+            <div className="col-6 col-md-3">
+              <label className="form-label text-muted-theme">Current HP</label>
+              <input className="form-control input-theme" type="number" min={0} value={npc.current_hp} disabled={off} onChange={setNum('current_hp')} />
+            </div>
+            {guide && (
+              <div className="col-12 npcb-guide">
+                <span>
+                  A CR {npc.challenge_rating} creature usually has AC {guide.ac}, {guide.hp[0]}–{guide.hp[1]} HP, {signed(guide.attack)} to hit,
+                  {' '}{guide.dpr[0]}–{guide.dpr[1]} damage a round and save DC {guide.dc}.
+                </span>
+                {!off && (
+                  <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => set({ armor_class: guide.ac, max_hp: midHp(guide), current_hp: mode === 'new' ? midHp(guide) : Math.min(npc.current_hp, midHp(guide)) })}>
+                    Use suggested AC and HP
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="col-12">
+              <label className="form-label text-muted-theme">Portrait URL</label>
+              <input className="form-control input-theme" placeholder="https://…" value={npc.image_url} disabled={off} onChange={(e) => set({ image_url: e.target.value.trim() })} />
+              {npc.image_url && badImage === npc.image_url && <small className="text-danger">Couldn’t load that image — check the link.</small>}
+            </div>
+          </div>
+          <h6 className="npcb-h">Traits of the creature</h6>
+          <NpcStatblockEditor bare show="details" value={npc} onChange={set} isOwner={isOwner} scores={npc as any} challengeRating={npc.challenge_rating} />
+        </div>
+  );
+
+  const panel_abilities = (
+        <div className="npcb-panel">
+          <h6 className="npcb-h">Ability scores &amp; saving throws</h6>
+          <div className="npcb-abilities">
+            {ABILITY_SCORES.map((a) => {
+              const score = (npc as any)[a.key] as number;
+              const proficient = npc.saving_throws.includes(a.key);
+              return (
+                <div key={a.key} className="npcb-ability">
+                  <em>{a.label}</em>
+                  <strong className="npcb-ability-mod">{signed(mods[a.key])}</strong>
+                  <div className="npcb-stepper">
+                    <button type="button" disabled={off || score <= 1} aria-label={`Decrease ${a.label}`} onClick={() => set({ [a.key]: score - 1 } as Partial<NpcData>)}>−</button>
+                    <input type="number" min={1} max={30} value={score} disabled={off} aria-label={`${a.label} score`} onChange={setNum(a.key as keyof NpcData)} />
+                    <button type="button" disabled={off || score >= 30} aria-label={`Increase ${a.label}`} onClick={() => set({ [a.key]: score + 1 } as Partial<NpcData>)}>+</button>
+                  </div>
+                  <button type="button" disabled={off} aria-pressed={proficient} className={`npcb-save ${proficient ? 'is-on' : ''}`}
+                    onClick={() => set({ saving_throws: proficient ? npc.saving_throws.filter((x) => x !== a.key) : [...npc.saving_throws, a.key] })}>
+                    {proficient ? '●' : '○'} Save {signed(mods[a.key] + (proficient ? pb : 0))}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <NpcSkills
+            skills={npc.skills}
+            onToggle={(sk) => set({ skills: npc.skills.includes(sk) ? npc.skills.filter((x) => x !== sk) : [...npc.skills, sk] })}
+            scores={npc as any}
+            challengeRating={npc.challenge_rating}
+            isOwner={isOwner}
+          />
+          <p className="text-muted-theme" style={{ fontSize: '0.78rem' }}>
+            {DND_SKILLS.length} skills · proficiency bonus {signed(pb)} comes from the challenge rating.
+          </p>
+        </div>
+  );
+
+  const panel_actions = (
+        <div className="npcb-panel">
+          <NpcStatblockEditor bare show="combat" skills={npc.skills} value={npc} onChange={set} isOwner={isOwner} scores={npc as any} challengeRating={npc.challenge_rating} />
+        </div>
+  );
+
+  const panel_magic = (
+        <div className="npcb-panel">
+          <NpcStatblockEditor bare show="magic" value={npc} onChange={set} isOwner={isOwner} scores={npc as any} challengeRating={npc.challenge_rating} />
+        </div>
+  );
+
+  const panel_notes = (
+        <div className="npcb-panel">
+          <RichTextEditor content={npc.notes} onChange={(html) => set({ notes: html })} readOnly={off} />
+        </div>
+  );
+
+  const panels: Record<Tab, React.ReactNode> = {
+    overview: panel_overview, abilities: panel_abilities, actions: panel_actions, magic: panel_magic, notes: panel_notes,
+  };
+
   return (
-    <div className="npcb">
+    <div ref={rootRef} className={`npcb ${narrow ? 'npcb--mobile' : ''}`}>
       {/* ---------- header ---------- */}
       <div className="npcb-header">
         <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => navigate('/dashboard/npcs')}>← NPCs</button>
@@ -181,175 +368,67 @@ export default function NpcBuilder({ mode, initial, isOwner, onSave, onCreate, o
         </div>
       </div>
 
-      <div className="npcb-body">
-        {/* ---------- live card ---------- */}
-        <aside className="npcb-card" aria-label="NPC summary">
-          <button
-            type="button" className="npcb-portrait" disabled={off}
-            title={off ? undefined : 'Set portrait image'} aria-label={off ? 'Portrait' : 'Set portrait image'}
-            onClick={() => setEditingPortrait((v) => !v)}
+      {narrow ? (
+        <>
+          <MobileVitalsBar
+            currentHp={npc.current_hp}
+            maxHp={npc.max_hp}
+            tempHp={0}
+            armorClass={npc.armor_class}
+            initiative={mods.dexterity}
+            name={npc.name || 'NPC'}
+            avatarUrl={npc.image_url && badImage !== npc.image_url ? npc.image_url : undefined}
+            isOwner={isOwner}
+            onDamage={(n) => set({ current_hp: Math.max(0, npc.current_hp - n) })}
+            onHeal={(n) => set({ current_hp: Math.min(npc.max_hp, npc.current_hp + n) })}
+            title="Stat block"
           >
-            {npc.image_url && badImage !== npc.image_url
-              ? <img src={npc.image_url} alt="" onError={() => setBadImage(npc.image_url)} />
-              : <span>{npc.name.trim() ? npc.name.trim()[0].toUpperCase() : '?'}</span>}
-            {!off && <em className="npcb-portrait-hint">{npc.image_url ? 'Change' : '＋ Add image'}</em>}
-          </button>
-          {editingPortrait && !off && (
-            <div className="npcb-portrait-edit">
-              <input
-                className="npcb-portrait-input" autoFocus placeholder="Paste an image URL" aria-label="Portrait image URL"
-                value={npc.image_url} onChange={(e) => set({ image_url: e.target.value.trim() })}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); setEditingPortrait(false); } }}
-              />
-              <div className="npcb-portrait-actions">
-                <button type="button" className="btn btn-sm btn-theme-primary" onClick={() => setEditingPortrait(false)}>Done</button>
-                {npc.image_url && <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => { set({ image_url: '' }); setEditingPortrait(false); }}>Remove</button>}
-              </div>
+            <div className="npcb-card npcb-card--flat">{summary(true)}</div>
+          </MobileVitalsBar>
+          <TabbedPanel
+            bottom
+            activeKey={tab}
+            onActiveChange={(k) => setTab(k as Tab)}
+            tabs={tabs.map((t) => ({ key: t.key, label: t.short, content: panels[t.key] }))}
+          />
+          {isOwner && (mode === 'new' || status !== 'idle' || error) && (
+            <div className="npcb-dock" role="status" aria-live="polite">
+              {mode === 'new' ? (
+                <>
+                  {error && <span className="npcb-status is-bad">{error}</span>}
+                  <button type="button" className="npcb-dock-create" onClick={create} disabled={creating}>
+                    {creating ? 'Creating…' : 'Create NPC'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  {status === 'saving' && <span className="npcb-status">Saving…</span>}
+                  {status === 'saved' && <span className="npcb-status is-ok">All changes saved</span>}
+                  {error && <span className="npcb-status is-bad">{error}</span>}
+                </>
+              )}
             </div>
           )}
-          {npc.image_url && badImage === npc.image_url && <div className="npcb-portrait-error">Couldn’t load that image — check the link.</div>}
-          <h3 className="npcb-card-name">{npc.name || 'Unnamed NPC'}</h3>
-          <div className="npcb-card-sub">
-            <span className={`npc-disposition-badge npc-disposition-${npc.disposition}`}>{npc.disposition}</span>
-            {npc.challenge_rating && <span>CR {npc.challenge_rating}</span>}
-          </div>
-          <div className="npcb-vitals">
-            <div><em>AC</em><strong>{npc.armor_class}</strong></div>
-            <div><em>HP</em><strong>{npc.max_hp}</strong></div>
-            <div><em>PROF</em><strong>{signed(pb)}</strong></div>
-          </div>
-          <div className="npcb-mods">
-            {ABILITY_SCORES.map((a) => (
-              <div key={a.key}><em>{a.label}</em><strong>{signed(mods[a.key])}</strong></div>
-            ))}
-          </div>
-          <dl className="npcb-facts">
-            <div><dt>Initiative</dt><dd>{signed(mods.dexterity)}</dd></div>
-            <div><dt>Passive Perception</dt><dd>{10 + perceptionBonus}</dd></div>
-            {npc.speed && <div><dt>Speed</dt><dd>{npc.speed}</dd></div>}
-            {npc.senses && <div><dt>Senses</dt><dd>{npc.senses}</dd></div>}
-            {npc.languages && <div><dt>Languages</dt><dd>{npc.languages}</dd></div>}
-            {npc.defenses && <div><dt>Defenses</dt><dd>{npc.defenses}</dd></div>}
-          </dl>
-          {(counts.combat > 0 || counts.magic > 0) && (
-            <div className="npcb-card-counts">
-              {npc.actions.length > 0 && <span>{npc.actions.length} action{npc.actions.length > 1 ? 's' : ''}</span>}
-              {npc.bonus_actions.length > 0 && <span>{npc.bonus_actions.length} bonus</span>}
-              {npc.reactions.length > 0 && <span>{npc.reactions.length} reaction{npc.reactions.length > 1 ? 's' : ''}</span>}
-              {npc.spells.length > 0 && <span>{npc.spells.length} spell{npc.spells.length > 1 ? 's' : ''}</span>}
-              {npc.equipment.length > 0 && <span>{npc.equipment.length} item{npc.equipment.length > 1 ? 's' : ''}</span>}
-            </div>
-          )}
-        </aside>
+        </>
+      ) : (
+        <div className="npcb-body">
+          <aside className="npcb-card" aria-label="NPC summary">
+            {summary(false)}
+          </aside>
 
-        {/* ---------- tabs ---------- */}
-        <section className="npcb-main">
-          <div className="npcb-tabs" role="tablist">
-            {tabs.map((t) => (
-              <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={tab === t.key ? 'is-on' : ''} onClick={() => setTab(t.key)}>
-                {t.label}{t.count ? <span className="npcb-tab-count">{t.count}</span> : null}
-              </button>
-            ))}
-          </div>
-
-          {tab === 'overview' && (
-            <div className="npcb-panel">
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <label className="form-label text-muted-theme">Campaign</label>
-                  <select className="form-select input-theme" value={npc.campaign_id} disabled={off} onChange={(e) => set({ campaign_id: e.target.value })}>
-                    {mode === 'edit' && <option value="">No campaign</option>}
-                    {campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label text-muted-theme">Tags</label>
-                  <input className="form-control input-theme" placeholder="Tavern keeper, Recurring" value={npc.categories} disabled={off} onChange={(e) => set({ categories: e.target.value })} />
-                </div>
-                <div className="col-6 col-md-3">
-                  <label className="form-label text-muted-theme">Challenge rating</label>
-                  <input className="form-control input-theme" placeholder="1/2" value={npc.challenge_rating} disabled={off} onChange={(e) => set({ challenge_rating: e.target.value })} />
-                </div>
-                <div className="col-6 col-md-3">
-                  <label className="form-label text-muted-theme">Armor class</label>
-                  <input className="form-control input-theme" type="number" min={0} value={npc.armor_class} disabled={off} onChange={setNum('armor_class')} />
-                </div>
-                <div className="col-6 col-md-3">
-                  <label className="form-label text-muted-theme">Max HP</label>
-                  <input className="form-control input-theme" type="number" min={1} value={npc.max_hp} disabled={off}
-                    onChange={(e) => { const m = Math.max(1, parseInt(e.target.value, 10) || 1); set({ max_hp: m, current_hp: mode === 'new' ? m : Math.min(npc.current_hp, m) }); }} />
-                </div>
-                <div className="col-6 col-md-3">
-                  <label className="form-label text-muted-theme">Current HP</label>
-                  <input className="form-control input-theme" type="number" min={0} value={npc.current_hp} disabled={off} onChange={setNum('current_hp')} />
-                </div>
-                <div className="col-12">
-                  <label className="form-label text-muted-theme">Portrait URL</label>
-                  <input className="form-control input-theme" placeholder="https://…" value={npc.image_url} disabled={off} onChange={(e) => set({ image_url: e.target.value.trim() })} />
-                  {npc.image_url && badImage === npc.image_url && <small className="text-danger">Couldn’t load that image — check the link.</small>}
-                </div>
-              </div>
-              <h6 className="npcb-h">Traits of the creature</h6>
-              <NpcStatblockEditor bare show="details" value={npc} onChange={set} isOwner={isOwner} scores={npc as any} challengeRating={npc.challenge_rating} />
+          <section className="npcb-main">
+            <div className="npcb-tabs" role="tablist">
+              {tabs.map((t) => (
+                <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={tab === t.key ? 'is-on' : ''} onClick={() => setTab(t.key)}>
+                  {t.label}{t.count ? <span className="npcb-tab-count">{t.count}</span> : null}
+                </button>
+              ))}
             </div>
-          )}
 
-          {tab === 'abilities' && (
-            <div className="npcb-panel">
-              <h6 className="npcb-h">Ability scores &amp; saving throws</h6>
-              <div className="npcb-abilities">
-                {ABILITY_SCORES.map((a) => {
-                  const score = (npc as any)[a.key] as number;
-                  const proficient = npc.saving_throws.includes(a.key);
-                  return (
-                    <div key={a.key} className="npcb-ability">
-                      <em>{a.label}</em>
-                      <strong className="npcb-ability-mod">{signed(mods[a.key])}</strong>
-                      <div className="npcb-stepper">
-                        <button type="button" disabled={off || score <= 1} aria-label={`Decrease ${a.label}`} onClick={() => set({ [a.key]: score - 1 } as Partial<NpcData>)}>−</button>
-                        <input type="number" min={1} max={30} value={score} disabled={off} aria-label={`${a.label} score`} onChange={setNum(a.key as keyof NpcData)} />
-                        <button type="button" disabled={off || score >= 30} aria-label={`Increase ${a.label}`} onClick={() => set({ [a.key]: score + 1 } as Partial<NpcData>)}>+</button>
-                      </div>
-                      <button type="button" disabled={off} aria-pressed={proficient} className={`npcb-save ${proficient ? 'is-on' : ''}`}
-                        onClick={() => set({ saving_throws: proficient ? npc.saving_throws.filter((x) => x !== a.key) : [...npc.saving_throws, a.key] })}>
-                        {proficient ? '●' : '○'} Save {signed(mods[a.key] + (proficient ? pb : 0))}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-              <NpcSkills
-                skills={npc.skills}
-                onToggle={(sk) => set({ skills: npc.skills.includes(sk) ? npc.skills.filter((x) => x !== sk) : [...npc.skills, sk] })}
-                scores={npc as any}
-                challengeRating={npc.challenge_rating}
-                isOwner={isOwner}
-              />
-              <p className="text-muted-theme" style={{ fontSize: '0.78rem' }}>
-                {DND_SKILLS.length} skills · proficiency bonus {signed(pb)} comes from the challenge rating.
-              </p>
-            </div>
-          )}
-
-          {tab === 'actions' && (
-            <div className="npcb-panel">
-              <NpcStatblockEditor bare show="combat" skills={npc.skills} value={npc} onChange={set} isOwner={isOwner} scores={npc as any} challengeRating={npc.challenge_rating} />
-            </div>
-          )}
-
-          {tab === 'magic' && (
-            <div className="npcb-panel">
-              <NpcStatblockEditor bare show="magic" value={npc} onChange={set} isOwner={isOwner} scores={npc as any} challengeRating={npc.challenge_rating} />
-            </div>
-          )}
-
-          {tab === 'notes' && (
-            <div className="npcb-panel">
-              <RichTextEditor content={npc.notes} onChange={(html) => set({ notes: html })} readOnly={off} />
-            </div>
-          )}
-        </section>
-      </div>
+            {panels[tab]}
+          </section>
+        </div>
+      )}
     </div>
   );
 }

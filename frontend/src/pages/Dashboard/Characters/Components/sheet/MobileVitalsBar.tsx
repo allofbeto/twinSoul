@@ -11,6 +11,8 @@ interface Props {
   name: string;
   avatarUrl?: string;
   isOwner: boolean;
+  /** Heading of the sheet the bar opens. */
+  title?: string;
   onDamage: (amount: number) => void;
   onHeal: (amount: number) => void;
   /** The full vitals card, shown in a bottom sheet when the bar is tapped. */
@@ -19,7 +21,7 @@ interface Props {
 
 // Phone header that stays in view: HP, AC and one-tap -1 / +1. Tap it for the
 // full vitals (damage, healing, rests, death saves, hit dice).
-const MobileVitalsBar = ({ currentHp, maxHp, tempHp, armorClass, initiative, name, avatarUrl, isOwner, onDamage, onHeal, children }: Props) => {
+const MobileVitalsBar = ({ currentHp, maxHp, tempHp, armorClass, initiative, name, avatarUrl, isOwner, title = 'Vitals', onDamage, onHeal, children }: Props) => {
   const [open, setOpen] = useState(false);
   const percent = maxHp > 0 ? Math.min(100, (currentHp / maxHp) * 100) : 0;
   const tone = percent <= 25 ? 'is-low' : percent <= 50 ? 'is-mid' : '';
@@ -55,7 +57,7 @@ const MobileVitalsBar = ({ currentHp, maxHp, tempHp, armorClass, initiative, nam
       </div>
 
       <Modal isOpen={open} toggle={() => setOpen(false)} centered scrollable fullscreen="sm" contentClassName="theme-modal">
-        <ModalHeader toggle={() => setOpen(false)}>Vitals</ModalHeader>
+        <ModalHeader toggle={() => setOpen(false)}>{title}</ModalHeader>
         <ModalBody><div className="sheet">{children}</div></ModalBody>
       </Modal>
     </>

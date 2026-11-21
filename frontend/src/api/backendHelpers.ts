@@ -42,6 +42,9 @@ export const deleteHomebrewRace = (index: string) => api.delete(`/char_races/${i
 export const createHomebrewClass = (data: object) => api.post('/char_classes', data);
 export const updateHomebrewClass = (index: string, data: object) => api.patch(`/char_classes/${index}`, data);
 export const deleteHomebrewClass = (index: string) => api.delete(`/char_classes/${index}`);
+/** Has Claude draft an NPC from a one-line concept. Nothing is saved. */
+export const draftNpc = (data: { concept: string; cr?: string; role?: string }) => api.post('/npcs/draft', data);
+
 export const importHomebrew = (url: string, kind: 'race' | 'class') => api.post('/homebrew/import', { url, kind });
 export const getHomebrewReviews = (campaignId: string) => api.get(`/campaigns/${campaignId}/homebrew_reviews`);
 export const reviewCharacterHomebrew = (characterId: string, decision: 'approve' | 'reject', note?: string) =>
@@ -75,6 +78,8 @@ export const migrateInventory = (characterId: string, actionType: string) => api
 
 // Monsters (shared SRD bestiary)
 export const getMonsters = () => api.get('/monsters');
+/** Name, CR, AC, HP and DEX only: for search pickers. */
+export const getMonsterOptions = () => api.get('/monsters', { params: { slim: 1 } });
 export const getMonster = (id: string) => api.get(`/monsters/${id}`);
 
 // Encounters

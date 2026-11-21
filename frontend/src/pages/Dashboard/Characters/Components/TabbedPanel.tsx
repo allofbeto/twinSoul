@@ -12,10 +12,16 @@ interface Props {
   tabs: SheetTab[];
   /** Phone layout: the tabs become a bottom navigation bar. */
   bottom?: boolean;
+  /** Controlled mode: the parent owns which tab is open. */
+  activeKey?: string;
+  onActiveChange?: (key: string) => void;
 }
 
 // Stroke icons for the bottom bar (24x24 viewBox).
 const ICONS: Record<string, string> = {
+  overview: 'M4 6h16 M4 12h16 M4 18h10',
+  abilities: 'M5 20V11 M12 20V4 M19 20v-6',
+  magic: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z M19 16v4 M17 18h4',
   actions: 'M13 2L4 14h7l-1 8 9-12h-7z',
   spells: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z M19 16v4 M17 18h4',
   resources: 'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16z M12 8v4l3 2',
@@ -36,8 +42,10 @@ const Icon = ({ name }: { name: string }) => (
 const MAX_BAR = 5;
 
 // The deeper parts of the sheet, one at a time.
-const TabbedPanel = ({ tabs, bottom }: Props) => {
-  const [activeKey, setActiveKey] = useState(tabs[0]?.key);
+const TabbedPanel = ({ tabs, bottom, activeKey: controlled, onActiveChange }: Props) => {
+  const [inner, setInner] = useState(tabs[0]?.key);
+  const activeKey = controlled ?? inner;
+  const setActiveKey = (key: string) => { setInner(key); onActiveChange?.(key); };
   const [moreOpen, setMoreOpen] = useState(false);
   const active = tabs.find((t) => t.key === activeKey) || tabs[0];
 
