@@ -14,10 +14,25 @@ class TableChannelRedactionTest < Minitest::Test
     assert_equal %w[id init isEnemy name revealed], out.keys.sort
   end
 
-  test "a player's character also shares its HP, and nothing else" do
-    out = redact([{ "id" => "c1", "name" => "Thorin", "init" => 14, "characterId" => "7", "hp" => 31, "maxHp" => 40,
+  test "a player's character also shares its HP (and temporary HP), and nothing else" do
+    out = redact([{ "id" => "c1", "name" => "Thorin", "init" => 14, "characterId" => "7", "hp" => 31, "maxHp" => 40, "tempHp" => 5,
                     "armorClass" => 18, "res" => { "used" => {} } }]).first
-    assert_equal %w[characterId hp id init maxHp name], out.keys.sort
+    assert_equal %w[characterId hp id init maxHp name tempHp], out.keys.sort
+  end
+
+  test "statuses are shared for characters and revealed creatures, cleaned up" do
+    pc = redact([{ "id" => "a", "name" => "Thorin", "characterId" => "7", "hp" => 1, "maxHp" => 2, "conditions" => ["Prone", "", "x" * 99], "exhaustion" => 9 }]).first
+    assert_equal ["Prone", "x" * 30], pc["conditions"]
+    assert_equal 6, pc["exhaustion"]
+    seen = redact([{ "id" => "b", "name" => "Wolf", "isEnemy" => true, "revealed" => true, "conditions" => ["Stunned"], "hp" => 4 }]).first
+    assert_equal ["Stunned"], seen["conditions"]
+    refute seen.key?("hp")
+  end
+
+  test "a hidden creature shares no statuses and no HP" do
+    out = redact([{ "id" => "a", "name" => "Goblin", "isEnemy" => true, "revealed" => false, "conditions" => ["Poisoned"], "exhaustion" => 2 }]).first
+    refute out.key?("conditions")
+    refute out.key?("exhaustion")
   end
 
   test "a hidden creature never shows its HP" do

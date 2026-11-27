@@ -55,7 +55,16 @@ class Api::V1::SessionsController < ApplicationController
   
     private
   
+    COMBATANT_KEYS = [
+      :id, :name, :init, :hp, :maxHp, :tempHp, :armorClass, :isEnemy, :revealed, :monsterId, :itemId, :characterId,
+      :exhaustion, { conditions: [] }, { pos: [] },
+      { res: [:legendaryUsed, { econ: %i[action bonus reaction move], used: {}, slotsUsed: {} }] }
+    ].freeze
+
     def session_params
-      params.permit(:title, :notes, :session_number, :played_on)
+      attrs = params.permit(:title, :notes, :session_number, :played_on, combat: [:turn, :round, { map: %i[id name] }, { combatants: COMBATANT_KEYS }])
+      # `combat: null` ends combat: strong parameters drop a null for a structured key, so say it outright.
+      attrs[:combat] = nil if params.key?(:combat) && params[:combat].nil?
+      attrs
     end
   end

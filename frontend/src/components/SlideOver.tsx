@@ -7,9 +7,11 @@ interface Props {
   title?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** A wide panel, for things that need room (a character sheet). */
+  wide?: boolean;
 }
 
-const SlideOver = ({ isOpen, onClose, title, children, footer }: Props) => {
+const SlideOver = ({ isOpen, onClose, title, children, footer, wide }: Props) => {
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -20,7 +22,7 @@ const SlideOver = ({ isOpen, onClose, title, children, footer }: Props) => {
   return (
     <div className={`slide-over-backdrop ${isOpen ? 'is-open' : ''}`} onClick={onClose} aria-hidden={!isOpen}>
       <div
-        className={`slide-over-panel ${isOpen ? 'is-open' : ''}`}
+        className={`slide-over-panel ${wide ? 'slide-over-panel--wide' : ''} ${isOpen ? 'is-open' : ''}`}
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}

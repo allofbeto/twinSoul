@@ -65,4 +65,15 @@ describe('PlayerCombat', () => {
     setup(0, [], []);
     expect(screen.getByText(/No combat right now/)).toBeInTheDocument();
   });
+
+  it('shows statuses on characters and revealed creatures', () => {
+    const withStatus: Combatant[] = [
+      { id: 'a', name: 'Wolf', init: 17, hp: 0, maxHp: 0, isEnemy: true, revealed: true, conditions: ['Stunned'] },
+      { id: 'b', name: 'Thorin', init: 12, hp: 20, maxHp: 30, characterId: 'pc1', conditions: ['Prone'], exhaustion: 2 },
+    ];
+    setup(0, mine, withStatus);
+    expect(screen.getByText('Stunned')).toBeInTheDocument();
+    expect(screen.getByText('Prone')).toBeInTheDocument();
+    expect(screen.getByText('Exhaustion 2')).toBeInTheDocument();
+  });
 });

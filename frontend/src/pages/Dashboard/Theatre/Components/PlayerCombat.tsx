@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { hpDisplay } from './hp';
+import { isCritical, useHpFx } from './useHpFx';
 import type { Combatant, MyCharacter } from './types';
 
 interface Props {
@@ -16,6 +18,21 @@ interface Props {
 // "your turn"), the order with the party's HP, joining with their own roll,
 // and letting the DM know they're finished. Names arrive already redacted by
 // the server, so a hidden creature is just "Unknown Creature" here.
+function PlayerHp({ c }: { c: Combatant }) {
+  const hp = hpDisplay({ hp: c.hp ?? 0, maxHp: c.maxHp ?? 0, tempHp: c.tempHp });
+  const fx = useHpFx(c.hp ?? 0, c.tempHp ?? 0);
+  return (
+    <span className={`theatre__hpbox ${fx.kind ? `is-${fx.kind}` : ''} ${fx.key % 2 ? 'is-b' : ''} ${isCritical(c.hp ?? 0, c.maxHp ?? 0) ? 'is-critical' : ''}`} title={`${hp.total}/${hp.max} HP${hp.temp ? ` (${hp.temp} temporary)` : ''}`}>
+      <span className="theatre__hp-track">
+        <span className="theatre__hp-temp" style={{ width: `${hp.totalPercent}%`, opacity: hp.temp > 0 ? 0.85 : 0 }} />
+        <span className="theatre__hp-ghost" style={{ width: `${hp.realPercent}%` }} />
+        <span className="theatre__hp-fill" style={{ width: `${hp.realPercent}%`, background: hp.color }} />
+      </span>
+      <span className="theatre__hp-num" style={{ color: hp.color }}>{hp.total}/{hp.max}</span>
+    </span>
+  );
+}
+
 export default function PlayerCombat({ combatants, turn, round, myCharacters, onJoin, onDone }: Props) {
   const [rolls, setRolls] = useState<Record<string, string>>({});
   const [doneSent, setDoneSent] = useState(false);
@@ -102,10 +119,11 @@ export default function PlayerCombat({ combatants, turn, round, myCharacters, on
                 <strong>{c.name}</strong>
                 {you && <em>You</em>}
               </span>
-              {c.characterId && (c.maxHp ?? 0) > 0 && (
-                <span className="theatre__hp" title={`${c.hp}/${c.maxHp} HP`}>
-                  <span className="theatre__hp-track"><span className="theatre__hp-fill" style={{ width: `${Math.round(((c.hp ?? 0) / (c.maxHp ?? 1)) * 100)}%` }} /></span>
-                  <span className="theatre__hp-num">{c.hp}/{c.maxHp}</span>
+              {c.characterId && (c.maxHp ?? 0) > 0 && <PlayerHp c={c} />}
+              {((c.conditions?.length ?? 0) > 0 || (c.exhaustion ?? 0) > 0) && (
+                <span className="theatre__pcombat-statuses">
+                  {(c.conditions ?? []).map((name) => <span key={name} className="theatre__status theatre__status--ro">{name}</span>)}
+                  {(c.exhaustion ?? 0) > 0 && <span className="theatre__status theatre__status--ro">Exhaustion {c.exhaustion}</span>}
                 </span>
               )}
             </li>

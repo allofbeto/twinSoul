@@ -7,6 +7,7 @@ class Campaign < ApplicationRecord
     has_many :players, class_name: 'Player', dependent: :destroy
     has_many :encounters, dependent: :nullify
     has_many :tracks, dependent: :destroy
+    has_many :battle_maps, dependent: :destroy
   
     validates :name, presence: true
     validates :status, inclusion: { in: %w[active inactive archived] }

@@ -90,6 +90,13 @@ export interface CombatantOption {
 }
 
 /** A DM-controlled creature's spent actions and resources. Lives only in the DM's tracker. */
+/** Which stat block a combatant's details button opens. */
+export interface DetailTarget {
+  kind: 'monster' | 'npc' | 'character';
+  id: string;
+  title: string;
+}
+
 export interface CombatResources {
   /** Action economy used this turn; cleared when the creature's turn comes round. */
   econ?: { action?: boolean; bonus?: boolean; reaction?: boolean; move?: boolean };
@@ -114,6 +121,12 @@ export interface Combatant {
   monsterId?: string | null;
   /** NPC / homebrew monster item, for looking up its actions. */
   itemId?: string | null;
+  /** Statuses (Prone, Stunned...). Shared with players for characters and revealed creatures. */
+  conditions?: string[];
+  /** Exhaustion level, 0 to 6. */
+  exhaustion?: number;
+  /** Temporary HP: soaks damage first and shows on top of the maximum (120 max + 10 temp reads 130/120). */
+  tempHp?: number;
   /** Spent actions and resources (DM-controlled creatures). */
   res?: CombatResources;
   /** Whether players are allowed to see this combatant's real name. Only
@@ -124,6 +137,8 @@ export interface Combatant {
   /** Set when this row is a player's own PC (added via the join-initiative
    * flow) — lets the tracker dedupe against repeat join requests. */
   characterId?: string | null;
+  /** Square on the battle map, when the fight has one. */
+  pos?: [number, number] | null;
 }
 
 /** What a player's join-initiative request resolves to, looked up
@@ -153,6 +168,22 @@ export interface Session {
   sessionNumber?: number;  // sessions.session_number
   playedOn?: string;       // sessions.played_on (date)
   updatedAt?: string;
+  /** The fight in progress, saved with the session until the DM ends it. */
+  combat?: SavedCombat | null;
+}
+
+/** What the initiative tracker saves on the session. */
+export interface SavedCombat {
+  combatants: Combatant[];
+  turn: number;
+  round: number;
+  /** The battle map the fight is on, if any. */
+  map?: CombatMapRef | null;
+}
+
+export interface CombatMapRef {
+  id: string;
+  name: string;
 }
 
 export interface SessionTheatreProps {

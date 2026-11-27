@@ -29,6 +29,8 @@ import SessionTheatre from './pages/Dashboard/Theatre/SessionTheatre';
 import Encounters from './pages/Dashboard/Encounters/Encounters';
 import NewEncounter from './pages/Dashboard/Encounters/NewEncounter';
 import EncounterDetail from './pages/Dashboard/Encounters/EncounterDetail';
+import Maps from './pages/Dashboard/Maps/Maps';
+import BattleMapBuilder from './pages/Dashboard/Maps/BattleMapBuilder';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
@@ -74,6 +76,8 @@ const App = () => {
             <Route path="encounters" element={<Encounters />} />
             <Route path="encounters/new" element={<NewEncounter />} />
             <Route path="encounters/:id" element={<EncounterDetail />} />
+            <Route path="maps" element={<Maps />} />
+            <Route path="maps/:id" element={<BattleMapBuilder />} />
             <Route path="my_account" element={<MyAccount />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" />} />

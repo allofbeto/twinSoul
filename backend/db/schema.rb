@@ -10,10 +10,30 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_11_16_130000) do
+ActiveRecord::Schema[7.0].define(version: 2026_11_26_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
+
+  create_table "battle_maps", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "campaign_id", null: false
+    t.uuid "user_id", null: false
+    t.uuid "session_id"
+    t.string "name", null: false
+    t.string "grid", default: "square", null: false
+    t.integer "width", null: false
+    t.integer "height", null: false
+    t.jsonb "cells", default: [], null: false
+    t.jsonb "props", default: {}, null: false
+    t.string "lighting", default: "bright", null: false
+    t.jsonb "settings", default: {}, null: false
+    t.boolean "template", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["campaign_id"], name: "index_battle_maps_on_campaign_id"
+    t.index ["session_id"], name: "index_battle_maps_on_session_id"
+    t.index ["user_id"], name: "index_battle_maps_on_user_id"
+  end
 
   create_table "campaigns", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "user_id", null: false
@@ -330,6 +350,7 @@ ActiveRecord::Schema[7.0].define(version: 2026_11_16_130000) do
     t.date "played_on"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.jsonb "combat"
     t.index ["campaign_id"], name: "index_sessions_on_campaign_id"
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end

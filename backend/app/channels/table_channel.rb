@@ -18,7 +18,7 @@ class TableChannel < ApplicationCable::Channel
       stream_from initiative_stream_name(campaign)
 
       transmit({ type: 'reveal', assets: STAGES[campaign.id] || [] })
-      state = INITIATIVE[campaign.id] || { 'combatants' => [], 'turn' => 0, 'round' => 1 }
+      state = INITIATIVE[campaign.id] || persisted_initiative(campaign) || { 'combatants' => [], 'turn' => 0, 'round' => 1 }
       transmit({ type: 'initiative', combatants: state['combatants'], turn: state['turn'], round: state['round'] || 1 })
     end
 
@@ -110,6 +110,14 @@ class TableChannel < ApplicationCable::Channel
 
     private
 
+    # If the server restarted while a fight was on, the DM's saved session still has it.
+    def persisted_initiative(campaign)
+      combat = Session.where(campaign_id: campaign.id).where.not(combat: nil).order(updated_at: :desc).pick(:combat)
+      return unless combat.is_a?(Hash)
+
+      { 'combatants' => redacted(combat['combatants']), 'turn' => combat['turn'].to_i, 'round' => [combat['round'].to_i, 1].max }
+    end
+
     # A player's own roll, kept to something a d20 plus modifiers could make.
     def initiative_from(value)
       n = Integer(value, exception: false)
@@ -128,18 +136,29 @@ class TableChannel < ApplicationCable::Channel
     # shown as "Unknown Creature" until the DM reveals it.
     PLAYER_VISIBLE = %w[id name init isEnemy revealed characterId].freeze
     # A player's character is nothing secret at the table, so its HP is shared too.
-    CHARACTER_VISIBLE = %w[hp maxHp].freeze
+    CHARACTER_VISIBLE = %w[hp maxHp tempHp].freeze
 
     def redacted(combatants)
       Array(combatants).filter_map do |c|
         next unless c.is_a?(Hash)
 
         visible = c.slice(*PLAYER_VISIBLE)
-        next visible.merge(c.slice(*CHARACTER_VISIBLE)) if visible['characterId'].present?
-        next visible if visible['revealed']
+        # A player's character shares its HP and statuses; so does a creature the DM has revealed (statuses only).
+        next visible.merge(c.slice(*CHARACTER_VISIBLE)).merge(statuses(c)) if visible['characterId'].present?
+        next visible.merge(statuses(c)) if visible['revealed']
 
         visible.merge('name' => 'Unknown Creature')
       end
+    end
+
+    # Statuses like Prone or Stunned, cleaned up: names only, a sensible count and length, exhaustion 0-6.
+    def statuses(c)
+      out = {}
+      conditions = Array(c['conditions']).map { |s| s.to_s[0, 30] }.reject(&:blank?).first(20)
+      out['conditions'] = conditions if conditions.any?
+      level = Integer(c['exhaustion'], exception: false)
+      out['exhaustion'] = level.clamp(0, 6) if level&.positive?
+      out
     end
 
     def owner?(campaign)

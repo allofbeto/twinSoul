@@ -54,6 +54,11 @@ const navItems: NavItem[] = [
     icon: "encounters",
   },
   {
+    label: "Battle maps",
+    path: "/dashboard/maps",
+    icon: "maps",
+  },
+  {
     label: "Sessions",
     path: "/dashboard/sessions",
     icon: "sessions",

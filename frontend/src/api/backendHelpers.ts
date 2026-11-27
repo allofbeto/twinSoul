@@ -95,6 +95,16 @@ export const createEncounter = (data: object) => api.post('/encounters', data);
 export const updateEncounter = (id: string, data: object) => api.patch(`/encounters/${id}`, data);
 export const deleteEncounter = (id: string) => api.delete(`/encounters/${id}`);
 
+// Battle maps (DM only)
+export const getBattleMaps = (campaignId: string, params?: { sessionId?: string }) =>
+  api.get(`/campaigns/${campaignId}/battle_maps`, { params: params?.sessionId ? { session_id: params.sessionId } : undefined });
+export const getBattleMap = (id: string) => api.get(`/battle_maps/${id}`);
+export const createBattleMap = (campaignId: string, data: object) => api.post(`/campaigns/${campaignId}/battle_maps`, data);
+export const updateBattleMap = (id: string, data: object) => api.patch(`/battle_maps/${id}`, data);
+export const deleteBattleMap = (id: string) => api.delete(`/battle_maps/${id}`);
+/** The dungeon helper reading what the DM typed. */
+export const interpretMapText = (data: { text: string; answers: object; asking: string | null }) => api.post('/battle_maps/interpret', data);
+
 // Players
 export const getPlayers = (campaignId: string) => api.get(`/campaigns/${campaignId}/players`);
 export const addPlayer = (campaignId: string, data: object) => api.post(`/campaigns/${campaignId}/players`, data);

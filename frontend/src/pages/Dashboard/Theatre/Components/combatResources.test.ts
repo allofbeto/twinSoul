@@ -105,3 +105,25 @@ describe('spending', () => {
     expect(resetForTurn(undefined)).toBeUndefined();
   });
 });
+
+describe('defenses', () => {
+  it('reads a bestiary monster’s resistances, immunities and vulnerabilities', () => {
+    const view = fromMonster({
+      actions: [],
+      damage_resistances: ['cold', 'bludgeoning, piercing, and slashing from nonmagical weapons'],
+      damage_immunities: ['poison'],
+      damage_vulnerabilities: ['fire'],
+      condition_immunities: ['Charmed', 'Frightened'],
+    });
+    expect(view.defenses?.resist.map((d) => d.label)).toEqual(['cold', 'physical (nonmagical weapons)']);
+    expect(view.defenses?.immune[0].types).toEqual(['poison']);
+    expect(view.defenses?.vulnerable[0].types).toEqual(['fire']);
+    expect(view.defenses?.conditionImmune).toEqual(['Charmed', 'Frightened']);
+  });
+
+  it('reads an NPC’s written defenses and keeps what it cannot place', () => {
+    const view = fromNpc({ defenses: 'Resistant to fire; wears a cloak of shadows', challenge_rating: '1' });
+    expect(view.defenses?.resist[0].types).toEqual(['fire']);
+    expect(view.defenseNote).toBe('wears a cloak of shadows');
+  });
+});

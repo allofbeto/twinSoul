@@ -2,16 +2,15 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import type { CreateCampaignObject } from '../formComponents/editor/CampaignObjectMention';
 import { renderNotes } from '../../pages/Dashboard/Theatre/Components/sanitizeNotes';
 import BlockEditor from './BlockEditor';
-import NpcPicker from './NpcPicker';
 import EntityLayer from './EntityLayer';
-import TrackPicker from './TrackPicker';
-import TrackCard from './TrackCard';
+import BeatWizard from './BeatWizard';
+import { SectionEdit, SectionView } from './BeatSections';
 import { useCampaignTracks } from './useTracks';
 import { ChevronDownIcon, ChevronUpIcon, CopyIcon, GripIcon, TrashIcon } from './Icons';
 import {
-  BLOCK_TYPES, beatProgress, blockLabel, move, newBeat, newBlock, newScene, parseNotebook, sceneMatches,
+  BEAT_TYPES, beatProgress, beatRefs, beatType, move, newScene, parseNotebook, sceneMatches, sectionFilled, sectionLabel,
   serializeNotebook, uid,
-  type Beat, type Block, type BlockType, type Notebook, type Scene,
+  type Beat, type BeatType, type Notebook, type Scene, type SectionKey,
 } from './model';
 import '../../styles/SessionNotebook.css';
 
@@ -26,19 +25,50 @@ interface Props {
   /** Start in run mode (editing controls hidden). */
   startInRun?: boolean;
   saveLabel?: string;
+  /** Set inside the theatre: lets beats put their NPCs / items on stage and open their encounter. */
+  theatre?: TheatreHooks;
 }
 
-const NPC_STARTER = '<ul><li><p></p></li></ul>';
+export interface TheatreHooks {
+  /** Whether this campaign object can be put on the stage. */
+  canReveal: (id: string) => boolean;
+  isOnStage: (id: string) => boolean;
+  reveal: (id: string) => void;
+  openEncounter: (encounterId: string) => void;
+  /** Start (or jump to) the fight on this beat's battle map. */
+  openMap?: (map: { id: string; name: string }) => void;
+}
+
+const REF_ICON: Record<string, string> = { npc: '🧙', item: '🗡️', map: '🗺️' };
+
+const SECTION_ORDER: SectionKey[] = ['read', 'npcs', 'find', 'branches', 'stage', 'note'];
+
+/** Little summary chips for a collapsed beat. */
+function beatChips(b: Beat): { cls: string; text: string }[] {
+  const chips: { cls: string; text: string }[] = [];
+  if (b.encounter) chips.push({ cls: 'fight', text: `⚔ ${b.encounter.name}` });
+  if (b.map) chips.push({ cls: 'art', text: `🗺 ${b.map.name}` });
+  b.npcs.filter((n) => n.name).forEach((n) => chips.push({ cls: 'npc', text: n.name }));
+  if (sectionFilled(b, 'read')) chips.push({ cls: '', text: '📖' });
+  if (sectionFilled(b, 'find')) chips.push({ cls: 'find', text: sectionLabel('find', b.type).split(' ')[0] });
+  if (sectionFilled(b, 'branches')) chips.push({ cls: '', text: '⑂' });
+  if (b.trackId || b.musicUrl) chips.push({ cls: 'music', text: '♫' });
+  if (b.artUrl) chips.push({ cls: 'art', text: '▧' });
+  return chips;
+}
 
 export default function SessionNotebook({
-  value, onChange, campaignId, onCreateObject, compact = false, startInRun = false, saveLabel,
+  value, onChange, campaignId, onCreateObject, compact = false, startInRun = false, saveLabel, theatre,
 }: Props) {
   const [nb, setNb] = useState<Notebook>(() => parseNotebook(value));
   const [activeId, setActiveId] = useState(() => nb.scenes[0].id);
   const [run, setRun] = useState(startInRun);
   const [query, setQuery] = useState('');
-  const [open, setOpen] = useState<Set<string>>(() => new Set([nb.scenes[0].beats[0]?.id]));
-  const [palette, setPalette] = useState<string | null>(null);
+  const [open, setOpen] = useState<Set<string>>(() => new Set(nb.scenes[0].beats[0] ? [nb.scenes[0].beats[0].id] : []));
+  // Sections the DM opened by hand on a beat (beyond the filled ones and the type's defaults).
+  const [shown, setShown] = useState<Record<string, SectionKey[]>>({});
+  // Guided builder: where the new beat goes (index to insert after; -1 = at the top).
+  const [wizard, setWizard] = useState<{ afterIndex: number } | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ id: string; over?: string; after?: boolean } | null>(null);
 
@@ -55,12 +85,15 @@ export default function SessionNotebook({
   const scene = nb.scenes.find((s) => s.id === activeId) ?? nb.scenes[0];
   const progress = useMemo(() => beatProgress(nb), [nb]);
 
-  const patchScene = (fn: (s: Scene) => Scene) =>
-    commit({ ...nbRef.current, scenes: nbRef.current.scenes.map((s) => (s.id === scene.id ? fn(s) : s)) });
+  // Always patch from nbRef so several patches in one tick (e.g. editor
+  // onChange + a picker) don't overwrite each other.
+  const patchScene = (fn: (s: Scene) => Scene) => {
+    const next = { ...nbRef.current, scenes: nbRef.current.scenes.map((s) => (s.id === scene.id ? fn(s) : s)) };
+    nbRef.current = next;
+    commit(next);
+  };
   const patchBeat = (beatId: string, fn: (b: Beat) => Beat) =>
     patchScene((s) => ({ ...s, beats: s.beats.map((b) => (b.id === beatId ? fn(b) : b)) }));
-  const patchBlock = (beatId: string, blockId: string, fn: (x: Block) => Block) =>
-    patchBeat(beatId, (b) => ({ ...b, blocks: b.blocks.map((x) => (x.id === blockId ? fn(x) : x)) }));
 
   const toggleOpen = (id: string) =>
     setOpen((prev) => {
@@ -75,7 +108,6 @@ export default function SessionNotebook({
     const s = known ?? nbRef.current.scenes.find((x) => x.id === id);
     setActiveId(id);
     setOpen(new Set(s?.beats.length ? [s.beats[0].id] : []));
-    setPalette(null);
     setConfirm(null);
   };
 
@@ -89,7 +121,7 @@ export default function SessionNotebook({
     const copy: Scene = JSON.parse(JSON.stringify(scene));
     copy.id = uid();
     copy.title = `${scene.title.replace(/ \(copy\)$/, '')} (copy)`;
-    copy.beats.forEach((b) => { b.id = uid(); b.blocks.forEach((x) => { x.id = uid(); }); });
+    copy.beats.forEach((b) => { b.id = uid(); b.npcs.forEach((n) => { n.key = uid(); }); });
     // Right after the original, so the copy is where you're looking.
     const scenes = nbRef.current.scenes.slice();
     scenes.splice(scenes.findIndex((x) => x.id === scene.id) + 1, 0, copy);
@@ -122,34 +154,21 @@ export default function SessionNotebook({
     pickScene(rest[0].id);
   };
 
-  const addBeat = (afterIndex: number) => {
-    const b = newBeat();
+  const insertBeat = (beat: Beat, afterIndex: number) => {
     patchScene((s) => {
       const beats = s.beats.slice();
-      beats.splice(afterIndex + 1, 0, b);
+      beats.splice(afterIndex + 1, 0, beat);
       return { ...s, beats };
     });
-    setOpen((p) => new Set(p).add(b.id));
+    setOpen((p) => new Set(p).add(beat.id));
   };
 
   const duplicateBeat = (i: number) => {
     const copy: Beat = JSON.parse(JSON.stringify(scene.beats[i]));
     copy.id = uid();
     copy.title += ' (copy)';
-    copy.blocks.forEach((x) => { x.id = uid(); });
-    patchScene((s) => {
-      const beats = s.beats.slice();
-      beats.splice(i + 1, 0, copy);
-      return { ...s, beats };
-    });
-  };
-
-  const addBlock = (beatId: string, type: BlockType) => {
-    patchBeat(beatId, (b) => ({
-      ...b,
-      blocks: [...b.blocks, newBlock(type, type === 'npc' ? NPC_STARTER : '')],
-    }));
-    setPalette(null);
+    copy.npcs.forEach((n) => { n.key = uid(); });
+    insertBeat(copy, i);
   };
 
   const askDelete = (key: string, doIt: () => void) => {
@@ -158,91 +177,48 @@ export default function SessionNotebook({
 
   const visibleScenes = nb.scenes.filter((s) => sceneMatches(s, query));
 
-  // ---------------- blocks ----------------
+  // ---------------- beats ----------------
 
-  const renderBlock = (beat: Beat, bi: number, block: Block, ki: number) => {
-    const isEmpty = !block.content && !block.url && !block.npc && !block.trackId;
-
-    if (run) {
-      if (isEmpty) return null;
-      return (
-        <section key={block.id} className={`nb-block nb-block--${block.type}`}>
-          <div className="nb-block-label">{blockLabel(block.type)}{block.npc && <span className="nb-npc-chip" data-id={block.npc.id} data-kind="npc" data-label={block.npc.name}>🧙 {block.npc.name}</span>}</div>
-          {block.content && (
-            <div className="nb-html" dangerouslySetInnerHTML={{ __html: renderNotes(block.content) }} />
-          )}
-          {block.type === 'art' && block.url && (
-            <img className="nb-art" src={block.url} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-          )}
-          {block.type === 'music' && block.trackId && tracks.find((t) => t.id === block.trackId) && (
-            <TrackCard track={tracks.find((t) => t.id === block.trackId)!} />
-          )}
-          {block.type === 'music' && block.url && !block.trackId && (
-            <a href={block.url} target="_blank" rel="noopener noreferrer">♫ Open music cue ↗</a>
-          )}
-        </section>
-      );
-    }
-
+  // Theatre only: what this beat can put in front of the players (or, for fights, open for the DM).
+  const renderStageBar = (beat: Beat) => {
+    if (!theatre) return null;
+    const refs = beatRefs(beat).filter((r) => theatre.canReveal(r.id));
+    if (!refs.length && !beat.encounter && !(beat.map && theatre.openMap)) return null;
     return (
-      <section key={block.id} className={`nb-block nb-block--${block.type}`}>
-        <div className="nb-block-label">
-          <span>{blockLabel(block.type)}</span>
-          <span className="nb-actions">
-            <button type="button" className="nb-btn nb-btn--ghost nb-btn--sm" title="Move up" aria-label="Move up"
-              onClick={() => patchBeat(beat.id, (b) => ({ ...b, blocks: move(b.blocks, ki, -1) }))}><ChevronUpIcon /></button>
-            <button type="button" className="nb-btn nb-btn--ghost nb-btn--sm" title="Move down" aria-label="Move down"
-              onClick={() => patchBeat(beat.id, (b) => ({ ...b, blocks: move(b.blocks, ki, 1) }))}><ChevronDownIcon /></button>
-            <button type="button" className={`nb-btn nb-btn--ghost nb-btn--sm nb-btn--trash ${confirm === block.id ? 'nb-btn--danger' : ''}`}
-              title="Delete block" aria-label="Delete block"
-              onClick={() => askDelete(block.id, () => patchBeat(beat.id, (b) => ({ ...b, blocks: b.blocks.filter((x) => x.id !== block.id) })))}>
-              {confirm === block.id ? <span>Delete?</span> : <TrashIcon />}
+      <div className="nb-stagebar" role="group" aria-label="Bring this beat to the table">
+        {beat.encounter && (
+          <button type="button" className="nb-stagebar-btn nb-stagebar-btn--fight" onClick={() => theatre.openEncounter(beat.encounter!.id)}
+            title="Open in Encounters — secret until you start it">
+            ⚔ {beat.encounter.name} <em>Encounter ›</em>
+          </button>
+        )}
+        {beat.map && theatre.openMap && (
+          <button type="button" className="nb-stagebar-btn nb-stagebar-btn--fight" onClick={() => theatre.openMap!(beat.map!)}
+            title="Open Combat on this battle map">
+            🗺 {beat.map.name} <em>Fight here ›</em>
+          </button>
+        )}
+        {refs.map((r) => {
+          const on = theatre.isOnStage(r.id);
+          return (
+            <button key={r.id} type="button" className={`nb-stagebar-btn ${on ? 'is-on' : ''}`} disabled={on}
+              onClick={() => theatre.reveal(r.id)} title={on ? 'Already on stage' : 'Show this to the players on the Stage'}>
+              {REF_ICON[r.kind]} {r.label} <em>{on ? 'On stage ✓' : 'Reveal'}</em>
             </button>
-          </span>
-        </div>
-        {block.type === 'music' && (
-          <TrackPicker
-            campaignId={campaignId}
-            trackId={block.trackId}
-            legacyUrl={block.url}
-            suggestedTitle={block.content.replace(/<[^>]+>/g, ' ').trim().split(/\s{2,}|\n/)[0]?.slice(0, 80)}
-            onLink={(trackId) => patchBlock(beat.id, block.id, (x) => ({ ...x, trackId, ...(trackId ? { url: undefined } : {}) }))}
-          />
-        )}
-        {block.type === 'npc' && (
-          <NpcPicker
-            value={block.npc}
-            onChange={(npc) => patchBlock(beat.id, block.id, (x) => ({ ...x, npc }))}
-            campaignId={campaignId}
-            onCreateObject={onCreateObject}
-          />
-        )}
-        <BlockEditor
-          content={block.content}
-          onChange={(html) => patchBlock(beat.id, block.id, (x) => ({ ...x, content: html }))}
-          placeholder={block.type === 'npc' ? 'One talking point per bullet…' : `Add ${blockLabel(block.type).replace(/^\S+\s/, '').toLowerCase()}…`}
-          campaignId={campaignId}
-          onCreateObject={onCreateObject}
-        />
-        {(block.type === 'art' || (block.type === 'music' && !campaignId)) && (
-          <input
-            className="nb-input nb-url"
-            placeholder={block.type === 'art' ? 'Paste image URL' : 'Paste music URL'}
-            value={block.url ?? ''}
-            onChange={(e) => patchBlock(beat.id, block.id, (x) => ({ ...x, url: e.target.value }))}
-          />
-        )}
-        {block.type === 'art' && block.url && (
-          <img className="nb-art" src={block.url} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-        )}
-      </section>
+          );
+        })}
+      </div>
     );
   };
 
-  // ---------------- beats ----------------
-
   const renderBeat = (beat: Beat, bi: number) => {
     const isOpen = open.has(beat.id);
+    const info = beatType(beat.type);
+    const visible = SECTION_ORDER.filter((k) =>
+      sectionFilled(beat, k) || (!run && (info.steps.includes(k) || shown[beat.id]?.includes(k))));
+    const hidden = SECTION_ORDER.filter((k) => !visible.includes(k));
+    const chips = beatChips(beat);
+
     return (
       <article key={beat.id} className={`nb-beat ${beat.done ? 'is-done' : ''} ${isOpen ? 'is-open' : ''}`}>
         <div className="nb-beat-head">
@@ -251,12 +227,30 @@ export default function SessionNotebook({
             onChange={(e) => patchBeat(beat.id, (b) => ({ ...b, done: e.target.checked }))}
           />
           {!run && isOpen ? (
+            <label className={`nb-type-ico nb-type-ico--${beat.type} nb-type-pick`} title={`${info.label} — change type`}>
+              <span aria-hidden="true">{info.icon}</span>
+              <select
+                aria-label="Beat type" value={beat.type}
+                onChange={(e) => patchBeat(beat.id, (b) => ({ ...b, type: e.target.value as BeatType }))}
+              >
+                {BEAT_TYPES.map((t) => <option key={t.type} value={t.type}>{t.icon} {t.label}</option>)}
+              </select>
+            </label>
+          ) : (
+            <span className={`nb-type-ico nb-type-ico--${beat.type}`} title={info.label} aria-label={info.label}>{info.icon}</span>
+          )}
+          {!run && isOpen ? (
             <input
               className="nb-beat-title-input" value={beat.title} aria-label="Beat title"
               onChange={(e) => patchBeat(beat.id, (b) => ({ ...b, title: e.target.value }))}
             />
           ) : (
             <button type="button" className="nb-beat-title" onClick={() => toggleOpen(beat.id)}>{beat.title || 'Untitled beat'}</button>
+          )}
+          {!isOpen && chips.length > 0 && (
+            <span className="nb-chips" aria-hidden="true">
+              {chips.slice(0, 4).map((c, i) => <span key={i} className={`nb-chip ${c.cls ? `nb-chip--${c.cls}` : ''}`}>{c.text}</span>)}
+            </span>
           )}
           {!run && isOpen && (
             <span className="nb-actions nb-actions--show">
@@ -280,24 +274,32 @@ export default function SessionNotebook({
         </div>
         {isOpen && (
           <div className="nb-beat-body">
-            {beat.blocks.map((x, ki) => renderBlock(beat, bi, x, ki))}
-            {!beat.blocks.length && !run && <div className="nb-empty">A blank page. Add whatever this beat needs.</div>}
-            {!run && (
-              <>
-                <div className="nb-addline">
-                  <button type="button" className="nb-btn nb-btn--primary"
-                    onClick={() => setPalette(palette === beat.id ? null : beat.id)}>＋ Content</button>
-                  <button type="button" className="nb-btn" onClick={() => addBeat(bi)}>＋ Beat after</button>
-                </div>
-                {palette === beat.id && (
-                  <div className="nb-palette">
-                    {BLOCK_TYPES.map((t) => (
-                      <button key={t.type} type="button" className="nb-btn nb-btn--sm" title={t.hint}
-                        onClick={() => addBlock(beat.id, t.type)}>{t.label}</button>
-                    ))}
-                  </div>
+            {theatre && renderStageBar(beat)}
+            {visible.map((k) => (
+              <section key={k} className={`nb-sec nb-sec--${k}`}>
+                <div className="nb-sec-label">{sectionLabel(k, beat.type)}</div>
+                {run ? (
+                  <SectionView beat={beat} section={k} tracks={tracks} />
+                ) : (
+                  <SectionEdit
+                    beat={beat} section={k} campaignId={campaignId} onCreateObject={onCreateObject}
+                    patch={(fn) => patchBeat(beat.id, fn)}
+                  />
                 )}
-              </>
+              </section>
+            ))}
+            {run && !visible.length && <div className="nb-note">Nothing written for this beat.</div>}
+            {!run && (
+              <div className="nb-addline">
+                {hidden.map((k) => (
+                  <button key={k} type="button" className="nb-btn nb-btn--ghost nb-btn--sm nb-ghost-sec"
+                    onClick={() => setShown((p) => ({ ...p, [beat.id]: [...(p[beat.id] ?? []), k] }))}>
+                    ＋ {sectionLabel(k, beat.type).replace(/^\S+\s/, '')}
+                  </button>
+                ))}
+                <span className="nb-addline-spacer" />
+                <button type="button" className="nb-btn nb-btn--sm" onClick={() => setWizard({ afterIndex: bi })}>＋ Beat after</button>
+              </div>
             )}
           </div>
         )}
@@ -315,7 +317,7 @@ export default function SessionNotebook({
       </div>
       {saveLabel && <span className="nb-save">{saveLabel}</span>}
       <button type="button" className={`nb-btn ${run ? '' : 'nb-btn--primary'}`}
-        onClick={() => { setRun((r) => !r); setPalette(null); setConfirm(null); }}>
+        onClick={() => { setRun((r) => !r); setConfirm(null); }}>
         {run ? '✎ Edit' : '▶ Run'}
       </button>
     </div>
@@ -413,11 +415,26 @@ export default function SessionNotebook({
             </div>
           )}
           {scene.beats.map(renderBeat)}
-          {!run && !scene.beats.length && (
-            <button type="button" className="nb-btn nb-btn--primary" onClick={() => addBeat(-1)}>＋ Add beat</button>
+          {!run && (
+            <button type="button" className="nb-new-beat" onClick={() => setWizard({ afterIndex: scene.beats.length - 1 })}>
+              <span className="nb-type-ico" aria-hidden="true">＋</span>
+              <span>{scene.beats.length ? 'New beat' : 'Add your first beat'}</span>
+              <em>Guided — answer a few quick questions</em>
+            </button>
           )}
+          {run && !scene.beats.length && <div className="nb-note">No beats in this scene yet.</div>}
         </div>
       </div>
+      {wizard && (
+        <BeatWizard
+          campaignId={campaignId}
+          onCreateObject={onCreateObject}
+          after={scene.beats[wizard.afterIndex]?.title}
+          themeFrom={rootRef}
+          onCancel={() => setWizard(null)}
+          onDone={(beat) => { insertBeat(beat, wizard.afterIndex); setWizard(null); }}
+        />
+      )}
     </div>
   );
 }

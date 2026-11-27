@@ -20,6 +20,7 @@ import type {
   CombatantOption,
   DmPanel,
   CombatResources,
+  DetailTarget,
   MyCharacter,
   NewItemInput,
   RevealAsset,
@@ -28,11 +29,15 @@ import type {
   SessionTheatreProps,
   StagedAsset,
   TheatreEncounter,
+  TheatreEncounterPhase,
+  EncounterCombatantSeed,
+  CombatMapRef,
 } from './Components/types';
 import { PANE_DEFAULT, PANE_MAX, PANE_MIN, clamp, coerceTheme } from './Components/types';
 import { rollExpression } from './Components/dice';
 import { useTable } from './Components/useTable';
 import { useCombatantOptions } from './Components/useCombatantOptions';
+import { useSessionCombat } from './Components/useSessionCombat';
 import CampaignGate from './Components/CampaignGate';
 import SessionPicker from './Components/SessionPicker';
 import Curtain from './Components/Curtain';
@@ -44,10 +49,16 @@ import DicePanel from './Components/DicePanel';
 import CombatView from './Components/CombatView';
 import type { BlankCombatant } from './Components/CombatView';
 import { resetForTurn } from './Components/combatResources';
+import { changeHp } from './Components/hp';
+import NpcDetailSlideOver from './Components/NpcDetailSlideOver';
+import CharacterDetailSlideOver from './Components/CharacterDetailSlideOver';
 import ScratchPanel from './Components/ScratchPanel';
 import EncounterTakeover from './Components/EncounterTakeover';
 import PlayerCombat from './Components/PlayerCombat';
-import SessionNotebook from '../../../components/sessionNotebook/SessionNotebook';
+import SessionNotebook, { type TheatreHooks } from '../../../components/sessionNotebook/SessionNotebook';
+import { parseNotebook, plannedEncounters, serializeNotebook, withRandomFight } from '../../../components/sessionNotebook/model';
+import type { Cell } from '../../../battlemap/grid';
+import EncountersView, { type EncounterEntry } from './Components/EncountersView';
 import MonsterDetailSlideOver from '../Monsters/Components/MonsterDetailSlideOver';
 import CharacterDetail from '../Characters/CharacterDetail';
 
@@ -65,6 +76,7 @@ function normalizeSession(raw: any): Session {
     sessionNumber: raw.session_number ?? undefined,
     playedOn: raw.played_on ?? undefined,
     updatedAt: raw.updated_at ?? undefined,
+    combat: raw.combat ?? null,
   };
 }
 
@@ -238,23 +250,20 @@ export default function SessionTheatre({
     return created;
   }, [selected]);
 
-  // Resizable panes. Initiative and Notes sit on the left of the stage (grow
-  // when dragged right); the Tray sits on the right (grows when dragged left).
-  type PaneKind = 'initiative' | 'notes' | 'tray';
+  // Resizable panes. Initiative sits on the left of the stage (grows when
+  // dragged right); the Tray sits on the right (grows when dragged left).
+  type PaneKind = 'initiative' | 'tray';
   const [initiativeW, setInitiativeW] = useState(PANE_DEFAULT);
-  const [notesW, setNotesW] = useState(PANE_DEFAULT);
   const [trayW, setTrayW] = useState(PANE_DEFAULT);
   const dragRef = useRef<{ kind: PaneKind; startX: number; startW: number } | null>(null);
 
   const widthFor = useCallback((kind: PaneKind) => {
     if (kind === 'initiative') return initiativeW;
-    if (kind === 'notes') return notesW;
     return trayW;
-  }, [initiativeW, notesW, trayW]);
+  }, [initiativeW, trayW]);
 
   const setWidthFor = useCallback((kind: PaneKind, next: number) => {
     if (kind === 'initiative') setInitiativeW(next);
-    else if (kind === 'notes') setNotesW(next);
     else setTrayW(next);
   }, []);
 
@@ -298,7 +307,6 @@ export default function SessionTheatre({
 
   const rootStyle = {
     '--initiative-w': `${initiativeW}px`,
-    '--notes-w': `${notesW}px`,
     '--tray-w': `${trayW}px`,
   } as unknown as CSSProperties;
 
@@ -324,6 +332,11 @@ export default function SessionTheatre({
   }, [encounterAsset?.instanceId]);
 
   const [viewMonsterId, setViewMonsterId] = useState<string | null>(null);
+  // An NPC or a character opened from the initiative tracker.
+  const [detail, setDetail] = useState<DetailTarget | null>(null);
+  const viewDetails = useCallback((t: DetailTarget) => {
+    if (t.kind === 'monster') setViewMonsterId(t.id); else setDetail(t);
+  }, []);
 
   // Player's main-space tab: the table (stage/encounter) or their own sheet.
   // Whichever of their characters is acting right now — if any — gets shown
@@ -340,10 +353,13 @@ export default function SessionTheatre({
   }, [isMyTurn]);
 
   const [tab, setTab] = useState<AssetKind>('art');
-  const [notesOpen, setNotesOpen] = useState(true);
-  // Stage (theatre + notes + tray) is always there; the Combat tab appears once an initiative exists.
-  const [view, setView] = useState<'stage' | 'combat'>('stage');
+  // Top-level DM views: Session (notebook), Stage (theatre + tray), Encounters (planned, secret), Combat (initiative).
+  const [view, setView] = useState<'session' | 'stage' | 'encounters' | 'combat'>('stage');
+  const [encounterId, setEncounterId] = useState<string | null>(null);
+  const [startedEncounters, setStartedEncounters] = useState<Set<string>>(() => new Set());
   const [combatOn, setCombatOn] = useState(false);
+  // The battle map the fight is on, if any (token positions live on each combatant).
+  const [combatMap, setCombatMap] = useState<CombatMapRef | null>(null);
   const [round, setRound] = useState(1);
   const [trayOpen, setTrayOpen] = useState(true);
   const [panel, setPanel] = useState<DmPanel>(null);
@@ -526,9 +542,29 @@ export default function SessionTheatre({
     flashRemoval(null);
   }, [removal, flashRemoval]);
 
+  // Damage is soaked by temporary HP first; healing stops at the maximum.
   const applyHp = useCallback((id: string, delta: number) => {
-    setCombatants((prev) => prev.map((c) =>
-      c.id === id ? { ...c, hp: Math.max(0, Math.min(c.maxHp || Infinity, c.hp + delta)) } : c));
+    setCombatants((prev) => prev.map((c) => (c.id === id ? { ...c, ...changeHp(c, delta) } : c)));
+  }, []);
+
+  const addTempHp = useCallback((id: string, amount: number) => {
+    setCombatants((prev) => prev.map((c) => (c.id === id ? { ...c, tempHp: (c.tempHp ?? 0) + amount } : c)));
+  }, []);
+
+  const toggleCondition = useCallback((id: string, name: string) => {
+    setCombatants((prev) => prev.map((c) => {
+      if (c.id !== id) return c;
+      const have = c.conditions ?? [];
+      return { ...c, conditions: have.includes(name) ? have.filter((x) => x !== name) : [...have, name] };
+    }));
+  }, []);
+
+  const setExhaustion = useCallback((id: string, level: number) => {
+    setCombatants((prev) => prev.map((c) => (c.id === id ? { ...c, exhaustion: Math.max(0, Math.min(6, level)) } : c)));
+  }, []);
+
+  const clearTempHp = useCallback((id: string) => {
+    setCombatants((prev) => prev.map((c) => (c.id === id ? { ...c, tempHp: 0 } : c)));
   }, []);
 
   // The next creature's turn: its action economy and legendary actions start fresh,
@@ -543,7 +579,7 @@ export default function SessionTheatre({
   }, []);
 
   const endCombat = useCallback(() => {
-    setCombatants([]); setTurn(0); setRound(1); setCombatOn(false); setView('stage'); flashRemoval(null);
+    setCombatants([]); setTurn(0); setRound(1); setCombatOn(false); setCombatMap(null); setView('stage'); flashRemoval(null);
   }, [flashRemoval]);
 
   // Orders everyone by initiative, keeping the turn on whoever is up.
@@ -559,15 +595,28 @@ export default function SessionTheatre({
     setCombatants((prev) => prev.map((c) => (c.id === id ? { ...c, res } : c)));
   }, []);
 
+  // Battle map: move tokens, switch maps.
+  const placeCombatants = useCallback((positions: Record<string, Cell | null>) => {
+    setCombatants((prev) => prev.map((c) => (c.id in positions ? { ...c, pos: positions[c.id] } : c)));
+  }, []);
+  const setFightMap = useCallback((ref: CombatMapRef | null, positions?: Record<string, Cell | null>) => {
+    setCombatMap(ref);
+    if (positions) placeCombatants(positions);
+  }, [placeCombatants]);
+
+  // Opening Combat starts an (empty) tracker if there isn't one yet.
+  const openCombat = useCallback(() => {
+    setCombatOn(true); setView('combat');
+  }, []);
   const toggleCombatView = useCallback(() => {
-    if (!combatOn) { setCombatOn(true); setView('combat'); } else setView((v) => (v === 'combat' ? 'stage' : 'combat'));
-  }, [combatOn]);
+    if (view === 'combat') setView('stage'); else openCombat();
+  }, [view, openCombat]);
 
   // Drops a revealed encounter's monsters into the tracker — one entry per
   // creature (a quantity of 3 becomes "Goblin 1/2/3"), each with a rolled
   // initiative and its snapshotted HP, if any.
-  const handleRollInitiative = useCallback((asset: StagedAsset) => {
-    const added: Combatant[] = (asset.combatants ?? []).flatMap((m) => {
+  const startCombatWith = useCallback((seeds: EncounterCombatantSeed[]) => {
+    const added: Combatant[] = seeds.flatMap((m) => {
       const hp = m.maxHp ?? 0;
       return Array.from({ length: Math.max(1, m.quantity) }, (_, i) => ({
         id: nextId(),
@@ -590,6 +639,19 @@ export default function SessionTheatre({
     setCombatOn(true);
     setView('combat');
   }, []);
+
+  const handleRollInitiative = useCallback(
+    (asset: StagedAsset) => startCombatWith(asset.combatants ?? []),
+    [startCombatWith],
+  );
+
+  // A planned encounter (or one phase of it) joins Combat — monsters start hidden from players.
+  const startEncounter = useCallback((enc: TheatreEncounter, phase: TheatreEncounterPhase) => {
+    startCombatWith(phase.monsters.map((m) => ({
+      name: m.name, quantity: m.quantity, maxHp: m.maxHp, armorClass: m.armorClass, monsterId: m.monsterId,
+    })));
+    setStartedEncounters((prev) => new Set(prev).add(enc.id));
+  }, [startCombatWith]);
 
   // Lets the DM correct a rolled (or manually entered) initiative later —
   // ties, house rules, a misread die, whatever — without reshuffling the
@@ -621,9 +683,10 @@ export default function SessionTheatre({
   useEffect(() => {
     if (selected?.role !== 'owner') return;
     // Only what players may see leaves the DM's browser (the server filters again).
-    const visible = combatants.map(({ id, name, init, isEnemy, revealed, characterId, hp, maxHp }) => (
-      characterId ? { id, name, init, isEnemy, revealed, characterId, hp, maxHp } : { id, name, init, isEnemy, revealed }
-    ));
+    const visible = combatants.map(({ id, name, init, isEnemy, revealed, characterId, hp, maxHp, tempHp, conditions, exhaustion }) => {
+      if (characterId) return { id, name, init, isEnemy, revealed, characterId, hp, maxHp, tempHp, conditions, exhaustion };
+      return revealed ? { id, name, init, isEnemy, revealed, conditions, exhaustion } : { id, name, init, isEnemy, revealed };
+    });
     const t = setTimeout(() => broadcastInitiative(visible as Combatant[], turn, round), 300);
     return () => clearTimeout(t);
   }, [combatants, turn, round, selected?.role, broadcastInitiative]);
@@ -649,6 +712,25 @@ export default function SessionTheatre({
   }, [characterAddRequest, selected?.role]);
 
   useEffect(() => { if (combatants.length > 0) setCombatOn(true); }, [combatants.length]);
+
+  // The fight belongs to the session: opening a session brings its initiative back,
+  // it saves as you play, and it stays until the DM ends combat.
+  useSessionCombat({
+    sessionId: activeSession?.id,
+    enabled: selected?.role !== 'player',
+    stored: sessions.find((x) => x.id === activeSession?.id)?.combat ?? null,
+    state: { combatants, turn, round, combatOn, map: combatMap },
+    restore: (combat) => {
+      setCombatants(combat?.combatants ?? []);
+      setTurn(combat?.turn ?? 0);
+      setRound(combat?.round ?? 1);
+      setCombatOn(!!combat);
+      setCombatMap(combat?.map ?? null);
+      setView(combat ? 'combat' : 'stage');
+    },
+    save: (id, combat) => updateSession(id, { combat }),
+    onSaved: (id, combat) => setSessions((prev) => prev.map((x) => (x.id === id ? { ...x, combat } : x))),
+  });
   // A "done" nudge goes stale once the turn moves on.
   useEffect(() => { clearTurnDone(); }, [turn, clearTurnDone]);
 
@@ -695,7 +777,43 @@ export default function SessionTheatre({
   // Clear any stale "Saved" indicator when switching to a different session.
   useEffect(() => {
     setNotesSaveStatus('idle');
+    setStartedEncounters(new Set());
+    setEncounterId(null);
   }, [activeSession?.id]);
+
+  // What the session's beats bring to the table: planned fights for the
+  // Encounters tab, and NPCs / items / locations the DM can put on stage.
+  const sessionPlan = useMemo(() => parseNotebook(effectiveNotes), [effectiveNotes]);
+  const encounterEntries = useMemo<EncounterEntry[]>(() => {
+    const byId = new Map(campaignEncounters.map((e) => [e.id, e]));
+    const planned = plannedEncounters(sessionPlan).map((p) => ({ id: p.encounterId, encounter: byId.get(p.encounterId) ?? null, plan: p }));
+    const ids = new Set(planned.map((p) => p.id));
+    const linked = campaignEncounters
+      .filter((e) => !!activeSession && e.sessionId === activeSession.id && !ids.has(e.id))
+      .map((e) => ({ id: e.id, encounter: e, plan: null }));
+    return [...planned, ...linked];
+  }, [sessionPlan, campaignEncounters, activeSession]);
+  // Leave the Encounters tab if the last planned fight goes away.
+  useEffect(() => {
+    if (view === 'encounters' && encounterEntries.length === 0) setView('session');
+  }, [view, encounterEntries.length]);
+
+  const revealable = useMemo(
+    () => new Map(campaignItems.filter((i) => i.kind === 'npc' || i.kind === 'item' || i.kind === 'map').map((i) => [i.id, i])),
+    [campaignItems],
+  );
+  const theatreHooks = useMemo<TheatreHooks>(() => ({
+    canReveal: (id) => revealable.has(id),
+    isOnStage: (id) => stage.some((a) => a.id === id),
+    reveal: (id) => { const a = revealable.get(id); if (a) addToStage(a); },
+    openEncounter: (id) => { setEncounterId(id); setView('encounters'); },
+    openMap: (ref) => { setCombatMap(ref); setCombatOn(true); setView('combat'); },
+  }), [revealable, stage, addToStage]);
+
+  // A quick map made mid-fight goes into the session notes as a Fight beat.
+  const recordRandomFight = useCallback((ref: CombatMapRef) => {
+    handleNotesChange(serializeNotebook(withRandomFight(parseNotebook(effectiveNotes), ref)));
+  }, [effectiveNotes, handleNotesChange]);
 
   // --- gates (all after the hooks above, so hook order stays stable) ---
 
@@ -823,7 +941,7 @@ export default function SessionTheatre({
         saveLabel={notesSaveLabel}
         campaignId={selected.id}
         onCreateObject={handleCreateItem}
-        compact
+        theatre={theatreHooks}
         startInRun
       />
     </div>
@@ -840,8 +958,8 @@ export default function SessionTheatre({
         <div className="theatre__sidenav-anchor">
           <TheatreSideNav
             onExit={onExit}
-            notesOpen={notesOpen}
-            onToggleNotes={() => setNotesOpen((v) => !v)}
+            notesOpen={view === 'session'}
+            onToggleNotes={() => setView((v) => (v === 'session' ? 'stage' : 'session'))}
             initiativeOpen={combatOn && view === 'combat'}
             onToggleInitiative={toggleCombatView}
             trayOpen={trayOpen}
@@ -882,22 +1000,42 @@ export default function SessionTheatre({
             <button type="button" className="theatre__mini" onClick={clearTurnDone} aria-label="Dismiss">✕</button>
           </div>
         )}
-        {combatOn && (
-          <nav className="theatre__viewtabs" aria-label="Views">
-            <button type="button" role="tab" aria-selected={view === 'stage'} className={view === 'stage' ? 'is-on' : ''} onClick={() => setView('stage')}>
-              <i className="bx bx-theater" aria-hidden="true" /> Stage
+        <nav className="theatre__viewtabs" role="tablist" aria-label="Views">
+          <button type="button" role="tab" aria-selected={view === 'session'} className={view === 'session' ? 'is-on' : ''} onClick={() => setView('session')}>
+            <i className="bx bx-book-open" aria-hidden="true" /> Session
+          </button>
+          <button type="button" role="tab" aria-selected={view === 'stage'} className={view === 'stage' ? 'is-on' : ''} onClick={() => setView('stage')}>
+            <i className="bx bx-theater" aria-hidden="true" /> Stage
+          </button>
+          {encounterEntries.length > 0 && (
+            <button type="button" role="tab" aria-selected={view === 'encounters'} className={view === 'encounters' ? 'is-on' : ''} onClick={() => setView('encounters')}>
+              <i className="bx bx-lock-alt" aria-hidden="true" /> Encounters <small>{encounterEntries.length}</small>
             </button>
-            <button type="button" role="tab" aria-selected={view === 'combat'} className={view === 'combat' ? 'is-on' : ''} onClick={() => setView('combat')}>
-              <i className="bx bx-shield-quarter" aria-hidden="true" /> Combat <small>{combatants.length}</small>
-            </button>
+          )}
+          <button type="button" role="tab" aria-selected={view === 'combat'} className={view === 'combat' ? 'is-on' : ''} onClick={openCombat}>
+            <i className="bx bx-shield-quarter" aria-hidden="true" /> Combat {combatOn && <small>{combatants.length}</small>}
+          </button>
+          {combatOn && (
             <span className="theatre__viewtabs-now">
               Round {round} · {combatants[turn]?.name ?? '—'}
               <button type="button" className="theatre__mini" onClick={nextTurn} disabled={combatants.length === 0}>Next ›</button>
             </span>
-          </nav>
-        )}
+          )}
+        </nav>
 
-        {combatOn && view === 'combat' ? (
+        {view === 'session' ? (
+          <section className="theatre__session-view" aria-label="Session notes">
+            {notesBody}
+          </section>
+        ) : view === 'encounters' && encounterEntries.length > 0 ? (
+          <EncountersView
+            entries={encounterEntries}
+            selectedId={encounterId}
+            startedIds={startedEncounters}
+            onSelect={setEncounterId}
+            onStart={startEncounter}
+          />
+        ) : combatOn && view === 'combat' ? (
           <CombatView
             combatants={combatants}
             turn={turn}
@@ -914,11 +1052,21 @@ export default function SessionTheatre({
             onNextTurn={nextTurn}
             onSortByInit={sortByInit}
             onApplyHp={applyHp}
+            onAddTemp={addTempHp}
+            onClearTemp={clearTempHp}
+            onToggleCondition={toggleCondition}
+            onSetExhaustion={setExhaustion}
             onEditInit={handleEditInit}
             onReorder={handleReorderCombatants}
             onToggleReveal={handleToggleReveal}
-            onViewMonster={setViewMonsterId}
+            onViewDetails={viewDetails}
             onSetRes={setCombatantRes}
+            campaignId={selected?.id ?? null}
+            sessionId={activeSession?.id ?? null}
+            mapRef={combatMap}
+            onSetMap={setFightMap}
+            onPlace={placeCombatants}
+            onQuickMap={recordRandomFight}
           />
         ) : (
         <div className="theatre__stage-view">
@@ -940,20 +1088,6 @@ export default function SessionTheatre({
               >
                 ⚔ {encounterAsset.title} — restore
               </button>
-            )}
-
-            {notesOpen && (
-              <aside className="theatre__notes" aria-label="Session notes">
-                {notesBody}
-              </aside>
-            )}
-            {notesOpen && (
-              <ResizeHandle
-                label="Resize notes panel"
-                onPointerDown={startResize('notes')}
-                onKeyDown={(e) => onHandleKey('notes', e)}
-                onReset={() => setNotesW(PANE_DEFAULT)}
-              />
             )}
 
             <Stage
@@ -989,6 +1123,8 @@ export default function SessionTheatre({
       </div>
 
       <MonsterDetailSlideOver monsterId={viewMonsterId} onClose={() => setViewMonsterId(null)} />
+      <NpcDetailSlideOver item={detail?.kind === 'npc' ? rawById[detail.id] ?? null : null} onClose={() => setDetail(null)} />
+      <CharacterDetailSlideOver characterId={detail?.kind === 'character' ? detail.id : null} title={detail?.title ?? 'Character'} onClose={() => setDetail(null)} />
     </div>
   );
 }

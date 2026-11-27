@@ -6,6 +6,7 @@ import { ABILITY_SCORES } from '../../Characters/constants';
 import {
   attackBonusOf, checkOf, customRollOf, damageTextOf, modOfScore, proficiencyForCr, saveTextOf, type Feature,
 } from '../../Npcs/statblock';
+import { parseDefenseEntry, parseDefenseText, type DefenseSet } from './conditions';
 import type { CombatResources } from './types';
 
 export type ActionGroup = 'action' | 'bonus' | 'reaction' | 'legendary' | 'trait' | 'spell';
@@ -31,6 +32,10 @@ export interface StatblockView {
   /** Spell slots by level. */
   slots: Record<string, number>;
   legendaryPool: number;
+  /** Resistances, immunities and vulnerabilities, when the stat block has them. */
+  defenses?: DefenseSet;
+  /** Defenses text we couldn't sort into the lists above. */
+  defenseNote?: string;
 }
 
 export const GROUP_ORDER: { key: ActionGroup; label: string }[] = [
@@ -108,7 +113,14 @@ export const fromMonster = (m: Raw): StatblockView => {
     }
   });
 
-  return { actions, slots, legendaryPool: actions.some((a) => a.group === 'legendary') ? 3 : 0 };
+  const list = (v: Raw) => (Array.isArray(v) ? v : []).map((x: Raw) => String(typeof x === 'string' ? x : x?.name ?? '')).filter(Boolean);
+  const defenses: DefenseSet = {
+    resist: list(m.damage_resistances).map(parseDefenseEntry),
+    immune: list(m.damage_immunities).map(parseDefenseEntry),
+    vulnerable: list(m.damage_vulnerabilities).map(parseDefenseEntry),
+    conditionImmune: list(m.condition_immunities),
+  };
+  return { actions, slots, legendaryPool: actions.some((a) => a.group === 'legendary') ? 3 : 0, defenses };
 };
 
 // ── The DM's own NPCs and homebrew monsters ──────────────────────────────────
@@ -164,7 +176,8 @@ export const fromNpc = (item: Raw): StatblockView => {
     Object.entries(item.spellcasting?.slots || {}).map(([k, v]) => [k, Number(v)]).filter(([, v]) => Number(v) > 0),
   ) as Record<string, number>;
 
-  return { actions, slots, legendaryPool: actions.some((a) => a.group === 'legendary') ? 3 : 0 };
+  const { defenses, leftover } = parseDefenseText(item.defenses);
+  return { actions, slots, legendaryPool: actions.some((a) => a.group === 'legendary') ? 3 : 0, defenses, defenseNote: leftover || undefined };
 };
 
 // ── Spending and resetting ───────────────────────────────────────────────────

@@ -15,6 +15,8 @@ Rails.application.routes.draw do
       post 'campaigns/:campaign_id/items', to: 'items#create_campaign_item'
       get 'campaigns/:campaign_id/tracks', to: 'tracks#index'
       post 'campaigns/:campaign_id/tracks', to: 'tracks#create'
+      get 'campaigns/:campaign_id/battle_maps', to: 'battle_maps#index'
+      post 'campaigns/:campaign_id/battle_maps', to: 'battle_maps#create'
       post 'characters/:id/migrate_inventory', to: 'characters#migrate_inventory'
       get 'users/search', to: 'users#search'
       resources :campaigns do
@@ -42,6 +44,8 @@ Rails.application.routes.draw do
       resources :sessions, only: [:index, :create, :update, :destroy]
       resources :encounters
       resources :tracks, only: [:update, :destroy]
+      post 'battle_maps/interpret', to: 'battle_maps#interpret'
+      resources :battle_maps, only: [:show, :update, :destroy]
       resource :user, only: [:show, :update, :destroy] do
         patch :deactivate
         patch :close
